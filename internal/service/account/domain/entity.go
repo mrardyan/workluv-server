@@ -1,12 +1,21 @@
 package domain
 
-import "strings"
+import (
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type Account struct {
-	ID       uint
-	Username string
-	Email    Email
-	Password Password
+	ID            uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	Email         Email     `gorm:"uniqueIndex;not null" json:"email"`
+	PasswordHash  string    `gorm:"not null" json:"-"`
+	FullName      string    `gorm:"size:200" json:"full_name"`
+	IsActive      bool      `gorm:"default:true" json:"is_active"`
+	EmailVerified bool      `gorm:"default:false" json:"email_verified"`
+	CreatedAt     time.Time `gorm:"default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt     time.Time `gorm:"default:CURRENT_TIMESTAMP" json:"updated_at"`
 }
 
 // TableName overrides the table name for GORM
@@ -22,6 +31,10 @@ func (e Email) IsValid() bool {
 
 type Password string
 
-func (e Password) IsValid() bool {
-	return len(e) >= 8
+func (p Password) IsValid() bool {
+	return len(p) >= 8
+}
+
+func (p Password) String() string {
+	return string(p)
 }
