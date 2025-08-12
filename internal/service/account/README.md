@@ -1,8 +1,8 @@
-# User Service
+# Account Service
 
 ## Overview
 
-The User Service manages user accounts with authentication and profile management capabilities.
+The Account Service manages user accounts with authentication and profile management capabilities.
 
 ## Architecture
 
@@ -15,8 +15,8 @@ Following Clean Architecture principles:
 
 ## API Endpoints
 
-- `POST /users/` - Create a new user
-- `DELETE /users/:id` - Delete a user by ID
+- `POST /accounts/` - Create a new account
+- `DELETE /accounts/:id` - Delete an account by ID
 
 ## Dependencies
 
@@ -26,13 +26,13 @@ Following Clean Architecture principles:
 
 ## Features
 
-- **User Management**: Create and delete user accounts
+- **Account Management**: Create and delete user accounts
 - **Profile Data**: Store username, email, and password
 - **Data Validation**: Input validation and error handling
 - **External Integration**: Ready for external API calls (email validation, etc.)
 
 ## Data Models
 
-- **User**: Core user entity with username, email, and password
+- **Account**: Core account entity with username, email, and password
 - **Email**: Type-safe email address
 - **Password**: Secure password storage (ready for hashing)

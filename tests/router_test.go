@@ -12,8 +12,8 @@ import (
 
 	"go-server/internal"
 	"go-server/internal/infrastructure"
-	"go-server/internal/service/user"
-	userDelivery "go-server/internal/service/user/delivery"
+	"go-server/internal/service/account"
+	accountDelivery "go-server/internal/service/account/delivery"
 	"go-server/internal/service/workspace"
 	workspaceDelivery "go-server/internal/service/workspace/delivery"
 	"go-server/pkg/config"
@@ -56,7 +56,7 @@ func TestRouterConnections(t *testing.T) {
 
 	// Register all routes
 	internal.RegisterHealthRoutes(router, db, redisClient)
-	user.RegisterUserService(router, db, httpClient)
+	account.RegisterAccountService(router, db, httpClient)
 	workspace.RegisterWorkspaceService(router, db, httpClient)
 
 	// Create test server
@@ -68,8 +68,8 @@ func TestRouterConnections(t *testing.T) {
 		testHealthEndpoints(t, testServer)
 	})
 
-	t.Run("User Service Routes", func(t *testing.T) {
-		testUserServiceRoutes(t, testServer)
+	t.Run("Account Service Routes", func(t *testing.T) {
+		testAccountServiceRoutes(t, testServer)
 	})
 
 	t.Run("Workspace Service Routes", func(t *testing.T) {
@@ -127,8 +127,8 @@ func testHealthEndpoints(t *testing.T, server *httptest.Server) {
 	}
 }
 
-// testUserServiceRoutes tests the user service endpoints
-func testUserServiceRoutes(t *testing.T, server *httptest.Server) {
+// testAccountServiceRoutes tests the account service endpoints
+func testAccountServiceRoutes(t *testing.T, server *httptest.Server) {
 	tests := []struct {
 		name           string
 		method         string
@@ -137,9 +137,9 @@ func testUserServiceRoutes(t *testing.T, server *httptest.Server) {
 		expectedStatus []int // Allow multiple valid status codes
 	}{
 		{
-			name:     "Create User - Valid Data",
+			name:     "Create Account - Valid Data",
 			method:   "POST",
-			endpoint: "/users/",
+			endpoint: "/accounts/",
 			payload: map[string]string{
 				"username": "testuser",
 				"email":    "test@example.com",
@@ -148,23 +148,23 @@ func testUserServiceRoutes(t *testing.T, server *httptest.Server) {
 			expectedStatus: []int{http.StatusCreated, http.StatusInternalServerError}, // May fail due to DB constraints
 		},
 		{
-			name:           "Create User - Invalid Data",
+			name:           "Create Account - Invalid Data",
 			method:         "POST",
-			endpoint:       "/users/",
+			endpoint:       "/accounts/",
 			payload:        map[string]string{}, // Empty payload
 			expectedStatus: []int{http.StatusBadRequest},
 		},
 		{
-			name:           "Delete User",
+			name:           "Delete Account",
 			method:         "DELETE",
-			endpoint:       "/users/1",
+			endpoint:       "/accounts/1",
 			payload:        nil,
-			expectedStatus: []int{http.StatusOK, http.StatusInternalServerError}, // May fail if user doesn't exist
+			expectedStatus: []int{http.StatusOK, http.StatusInternalServerError}, // May fail if account doesn't exist
 		},
 		{
-			name:           "Delete User - Invalid ID",
+			name:           "Delete Account - Invalid ID",
 			method:         "DELETE",
-			endpoint:       "/users/invalid",
+			endpoint:       "/accounts/invalid",
 			payload:        nil,
 			expectedStatus: []int{http.StatusBadRequest},
 		},
@@ -338,13 +338,13 @@ func TestIndividualRouterComponents(t *testing.T) {
 		fmt.Printf("✅ Router setup successful\n")
 	})
 
-	t.Run("User Router Creation", func(t *testing.T) {
+	t.Run("Account Router Creation", func(t *testing.T) {
 		router := infrastructure.SetupRouter()
-		userRouter := userDelivery.NewUserRouter(router)
-		if userRouter == nil {
-			t.Fatal("Expected user router to be non-nil")
+		accountRouter := accountDelivery.NewAccountRouter(router)
+		if accountRouter == nil {
+			t.Fatal("Expected account router to be non-nil")
 		}
-		fmt.Printf("✅ User router creation successful\n")
+		fmt.Printf("✅ Account router creation successful\n")
 	})
 
 	t.Run("Workspace Router Creation", func(t *testing.T) {

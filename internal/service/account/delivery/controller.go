@@ -1,8 +1,8 @@
 package delivery
 
 import (
-	"go-server/internal/service/user/domain"
-	"go-server/internal/service/user/repository"
+	"go-server/internal/service/account/domain"
+	"go-server/internal/service/account/repository"
 	"net/http"
 	"strconv"
 
@@ -15,7 +15,7 @@ type Controller struct {
 	HTTPClient *http.Client
 }
 
-func NewUserController(db *gorm.DB, httpClient *http.Client) *Controller {
+func NewAccountController(db *gorm.DB, httpClient *http.Client) *Controller {
 	repo := repository.NewGormRepository(db)
 	useCase := domain.NewUseCase(repo)
 	return &Controller{
@@ -24,7 +24,7 @@ func NewUserController(db *gorm.DB, httpClient *http.Client) *Controller {
 	}
 }
 
-func (ctl *Controller) CreateUser(c *gin.Context) {
+func (ctl *Controller) CreateAccount(c *gin.Context) {
 	var req struct {
 		Username string `json:"username" binding:"required"`
 		Email    string `json:"email" binding:"required"`
@@ -36,7 +36,7 @@ func (ctl *Controller) CreateUser(c *gin.Context) {
 		return
 	}
 
-	user, err := ctl.UseCase.CreateUser(domain.User{
+	account, err := ctl.UseCase.CreateAccount(domain.Account{
 		Username: req.Username,
 		Email:    domain.Email(req.Email),
 		Password: domain.Password(req.Password),
@@ -47,21 +47,21 @@ func (ctl *Controller) CreateUser(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, user)
+	c.JSON(http.StatusCreated, account)
 }
 
-func (ctl *Controller) DeleteUser(c *gin.Context) {
+func (ctl *Controller) DeleteAccount(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid account ID"})
 		return
 	}
 
-	err = ctl.UseCase.DeleteUser(uint(id))
+	err = ctl.UseCase.DeleteAccount(uint(id))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "Account deleted successfully"})
 }

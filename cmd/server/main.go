@@ -3,7 +3,7 @@ package main
 import (
 	"go-server/internal"
 	"go-server/internal/infrastructure"
-	"go-server/internal/service/user"
+	"go-server/internal/service/account"
 	"go-server/internal/service/workspace"
 	"go-server/pkg/config"
 	"go-server/pkg/logger"
@@ -37,10 +37,10 @@ func main() {
 	router := infrastructure.SetupRouter()
 
 	// Step 5: Register all application services and their respective routes with the router.
-	// This includes the user service and the workspace service, both of which may depend on
+	// This includes the account service and the workspace service, both of which may depend on
 	// the database connection and the HTTP client for their operations.
 	internal.RegisterHealthRoutes(router, db, redisClient)
-	user.RegisterUserService(router, db, httpClient)
+	account.RegisterAccountService(router, db, httpClient)
 	workspace.RegisterWorkspaceService(router, db, httpClient)
 
 	// Step 6: Start the HTTP server on the configured port and listen for incoming requests.

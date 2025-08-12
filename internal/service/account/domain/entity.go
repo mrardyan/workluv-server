@@ -2,11 +2,16 @@ package domain
 
 import "strings"
 
-type User struct {
+type Account struct {
 	ID       uint
 	Username string
 	Email    Email
 	Password Password
+}
+
+// TableName overrides the table name for GORM
+func (Account) TableName() string {
+	return "accounts"
 }
 
 type Email string
