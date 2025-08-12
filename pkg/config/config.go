@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -14,6 +15,7 @@ type Config struct {
 	Server   ServerConfig
 	Log      LogConfig
 	JWT      JWTConfig
+	CORS     CORSConfig
 }
 
 // DatabaseConfig holds database configuration
@@ -53,6 +55,11 @@ type JWTConfig struct {
 	RefreshExpiry time.Duration // SESSION_EXPIRATION
 }
 
+// CORSConfig holds CORS configuration
+type CORSConfig struct {
+	AllowedOrigins []string
+}
+
 // Load loads configuration from environment variables
 func Load() *Config {
 	config := &Config{
@@ -61,6 +68,7 @@ func Load() *Config {
 		Server:   loadServerConfig(),
 		Log:      loadLogConfig(),
 		JWT:      loadJWTConfig(),
+		CORS:     loadCORSConfig(),
 	}
 
 	// Build DATABASE_URL from individual components
@@ -122,6 +130,20 @@ func loadJWTConfig() JWTConfig {
 func buildDatabaseURL(db DatabaseConfig) string {
 	return fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=%s",
 		db.User, db.Password, db.Host, db.Port, db.Name, db.SSLMode)
+}
+
+func loadCORSConfig() CORSConfig {
+	allowedOriginsStr := getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
+	allowedOrigins := strings.Split(allowedOriginsStr, ",")
+
+	// Trim whitespace from each origin
+	for i, origin := range allowedOrigins {
+		allowedOrigins[i] = strings.TrimSpace(origin)
+	}
+
+	return CORSConfig{
+		AllowedOrigins: allowedOrigins,
+	}
 }
 
 func getEnv(key, defaultValue string) string {

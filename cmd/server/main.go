@@ -35,7 +35,7 @@ func main() {
 	httpClient := infrastructure.NewDefaultHTTPClient()
 
 	// Step 4: Set up the Gin HTTP router, which will handle all incoming HTTP requests.
-	router := infrastructure.SetupRouter()
+	router := infrastructure.SetupRouter(cfg)
 
 	// Step 5: Register all application services and their respective routes with the router.
 	// This includes the account service, session service, and workspace service, both of which may depend on
