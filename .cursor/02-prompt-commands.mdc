@@ -1,0 +1,282 @@
+---
+description: Defines prompt prefix commands for streamlined development workflow automation.
+alwaysApply: false
+---
+
+# Prompt Command Prefixes
+
+## Overview
+These prompt prefix commands provide a streamlined way to trigger common development tasks through natural language commands. When the user types these prefixes, the AI should immediately recognize and execute the corresponding workflow.
+
+## Commit Commands
+
+### 1. `commit batch:`
+**Purpose**: Commit all changes in organized batches per module/feature/structure
+**Behavior**: 
+- Analyze all staged/unstaged changes
+- Group changes logically by architecture layers and modules
+- Create multiple focused commits in dependency order
+- Follow commit standards from `.cursor/02-commit-standards.mdc`
+
+**Commit Order (Most Independent First)**:
+1. **Project setup files** (go.mod, docker-compose.yaml, Dockerfile, scripts)
+2. **Core application structure** (cmd/, main.go, health.go)
+3. **Infrastructure layer** (internal/infrastructure/)
+4. **Service modules** (internal/service/user/, internal/service/workspace/)
+5. **Configuration packages** (pkg/config/, pkg/logger/)
+6. **Database migrations** (migration/)
+7. **Docker/deployment setup** (templates/do/, DEPLOYMENT.md)
+8. **Scripts** (scripts/)
+9. **Templates** (templates/)
+10. **Testing infrastructure** (tests/)
+11. **Documentation** (README.md files, .cursor/)
+
+**Example Execution**:
+```bash
+# User types: "commit batch:"
+# AI executes:
+git add scripts/
+git commit -m "chore(scripts): update deployment and migration scripts"
+
+git add internal/infrastructure/
+git commit -m "feat(infrastructure): add database and network configuration"
+
+git add internal/service/user/
+git commit -m "feat(user-service): implement user management endpoints"
+
+# ... continue with logical grouping
+```
+
+### 2. `commit all:`
+**Purpose**: Commit all changes at once with a comprehensive message
+**Behavior**:
+- Stage all changes
+- Create single commit with descriptive message covering all changes
+- Use appropriate scope and type based on dominant change type
+- Include detailed body listing all modifications
+
+**Example Execution**:
+```bash
+# User types: "commit all:"
+# AI executes:
+git add .
+git commit -m "feat(services): implement user and workspace services with infrastructure
+
+- Add user service with CRUD operations
+- Add workspace service with management capabilities  
+- Implement database infrastructure with GORM
+- Add HTTP routing and middleware setup
+- Include migration scripts and templates
+- Update documentation and deployment configs"
+```
+
+### 3. `commit <module/layer/context>:`
+**Purpose**: Commit only changes related to a specific module, layer, or context
+**Behavior**:
+- Identify files related to the specified scope
+- Stage only relevant changes
+- Create focused commit for that specific area
+- Use appropriate scope in commit message
+
+**Supported Contexts**:
+- **Modules**: `user-service`, `workspace-service`, `infrastructure`, `config`
+- **Layers**: `domain`, `delivery`, `repository`, `usecase`
+- **Areas**: `docs`, `tests`, `migration`, `scripts`, `templates`, `docker`
+
+**Example Execution**:
+```bash
+# User types: "commit user-service:"
+# AI executes:
+git add internal/service/user/
+git commit -m "feat(user-service): implement user management with CRUD operations"
+
+# User types: "commit domain:"
+# AI executes:
+git add internal/service/*/domain/
+git commit -m "feat(domain): add business logic and entities for all services"
+
+# User types: "commit docs:"
+# AI executes:
+git add README.md */README.md .cursor/
+git commit -m "docs: update service documentation and development rules"
+```
+
+## Migration Commands
+
+### 4. `create migration:`
+**Purpose**: Create a new database migration using proper naming conventions
+**Behavior**:
+- Extract migration name from the command
+- Validate naming conventions (snake_case, action verbs)
+- Use migration script with proper timestamp generation
+- Open generated migration file for editing
+- Follow migration rules from `.cursor/05-migration-rules.mdc`
+
+**Command Format**: `create migration: <descriptive_name> [environment]`
+
+**Example Execution**:
+```bash
+# User types: "create migration: add_user_roles dev"
+# AI executes:
+./scripts/migrate.sh create add_user_roles dev
+
+# User types: "create migration: create_audit_table"
+# AI executes (defaults to dev environment):
+./scripts/migrate.sh create create_audit_table dev
+```
+
+**Validation Rules**:
+- Must use snake_case naming
+- Must start with action verbs: `add_`, `create_`, `remove_`, `drop_`, `update_`, `alter_`, `fix_`, `migrate_`, `seed_`
+- Must not use generic names like `migration1`, `update`, `fix`
+- Must include affected table names when applicable
+
+## Build and Test Commands
+
+### 5. `build and test:`
+**Purpose**: Build and test the project before proceeding with changes
+**Behavior**:
+- Run go build to check compilation
+- Execute test suite
+- Report any issues found
+- Stop workflow if build/tests fail
+
+**Example Execution**:
+```bash
+# User types: "build and test:"
+# AI executes:
+go mod tidy
+go build ./cmd/server/
+go test ./...
+docker-compose build --no-cache
+```
+
+## Deployment Commands
+
+### 6. `deploy to:`
+**Purpose**: Deploy application to specified environment
+**Behavior**:
+- Validate environment (development, staging, production)
+- Use appropriate deployment template
+- Execute deployment script with environment-specific configs
+
+**Command Format**: `deploy to: <environment>`
+
+**Example Execution**:
+```bash
+# User types: "deploy to: staging"
+# AI executes:
+./scripts/deploy.sh staging
+
+# Uses templates/do/app-staging.template.yaml
+# Applies staging environment variables
+```
+
+## Development Workflow Commands
+
+### 7. `setup project:`
+**Purpose**: Initialize or reset project development environment
+**Behavior**:
+- Run setup script
+- Initialize database
+- Apply migrations
+- Start development services
+
+**Example Execution**:
+```bash
+# User types: "setup project:"
+# AI executes:
+./scripts/setup.sh
+./scripts/migrate.sh up dev
+docker-compose up -d postgres redis
+```
+
+### 8. `clean temp:`
+**Purpose**: Clean up temporary files and directories
+**Behavior**:
+- Remove `.temp` directory contents
+- Clean up temporary test files
+- Remove build artifacts
+
+**Example Execution**:
+```bash
+# User types: "clean temp:"
+# AI executes:
+rm -rf .temp/*
+go clean
+docker system prune -f
+```
+
+## Command Recognition Rules
+
+### Pattern Matching
+- Commands are case-insensitive
+- Trailing colons are required for recognition
+- Additional text after colon is treated as parameters
+- Commands can be embedded in natural language sentences
+
+### Error Handling
+- Invalid commands should prompt for clarification
+- Missing parameters should request required information
+- Failed operations should report specific error messages
+- Always validate before executing destructive operations
+
+### Confirmation Requirements
+Commands requiring confirmation:
+- `commit all:` (if many changes)
+- `deploy to: production`
+- `clean temp:` (if contains important files)
+- Migration creation (validate naming first)
+
+## Integration with Development Rules
+
+These commands work in conjunction with:
+- **General Rules** (`.cursor/01-general-rules.mdc`): Code quality and Go idioms
+- **Commit Standards** (`.cursor/02-commit-standards.mdc`): Commit message formatting
+- **Service Template** (`.cursor/03-service-template.mdc`): Service architecture consistency
+- **Temporary Folder** (`.cursor/04-temporary-folder.mdc`): Temp file management
+- **Migration Rules** (`.cursor/05-migration-rules.mdc`): Database migration standards
+
+## Best Practices
+
+### Command Usage
+- Use `commit batch:` for complex multi-module changes
+- Use `commit all:` for simple, cohesive changes
+- Use specific scope commits during focused development
+- Always use migration script for database changes
+- Test before committing or deploying
+
+### Workflow Integration
+- Commands should be self-documenting
+- Operations should be idempotent where possible
+- Always validate before executing
+- Provide clear feedback on command execution
+- Follow project conventions and standards
+
+## Examples of Natural Language Usage
+
+```
+User: "I've made changes to the user service and infrastructure, commit batch:"
+AI: Executes organized batch commits
+
+User: "All the workspace service files are ready, commit all:"
+AI: Creates single comprehensive commit
+
+User: "Just commit the domain layer changes commit domain:"
+AI: Commits only domain-related files
+
+User: "I need to create migration: add_user_permissions for dev environment"
+AI: Creates migration using proper script and naming
+
+User: "Let's build and test: everything before deployment"
+AI: Runs complete build and test suite
+```
+
+## Remember
+- **Always validate** command parameters before execution
+- **Use proper scoping** for commit messages
+- **Follow naming conventions** for migrations
+- **Test before commit** when possible
+- **Provide clear feedback** on command execution
+- **Stop on errors** and report issues clearly
+- **Confirm destructive operations** before execution
