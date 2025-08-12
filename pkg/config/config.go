@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 )
 
 // Config holds all configuration for our application
@@ -12,6 +13,7 @@ type Config struct {
 	Redis    RedisConfig
 	Server   ServerConfig
 	Log      LogConfig
+	JWT      JWTConfig
 }
 
 // DatabaseConfig holds database configuration
@@ -43,6 +45,14 @@ type LogConfig struct {
 	Level string
 }
 
+// JWTConfig holds JWT configuration
+type JWTConfig struct {
+	Secret        string
+	RefreshSecret string
+	AccessExpiry  time.Duration // JWT_EXPIRATION
+	RefreshExpiry time.Duration // SESSION_EXPIRATION
+}
+
 // Load loads configuration from environment variables
 func Load() *Config {
 	config := &Config{
@@ -50,6 +60,7 @@ func Load() *Config {
 		Redis:    loadRedisConfig(),
 		Server:   loadServerConfig(),
 		Log:      loadLogConfig(),
+		JWT:      loadJWTConfig(),
 	}
 
 	// Build DATABASE_URL from individual components
@@ -92,6 +103,19 @@ func loadServerConfig() ServerConfig {
 func loadLogConfig() LogConfig {
 	return LogConfig{
 		Level: getEnv("LOG_LEVEL", "info"),
+	}
+}
+
+func loadJWTConfig() JWTConfig {
+	// Parse duration strings from environment (e.g., "24h", "168h")
+	accessExpiry, _ := time.ParseDuration(getEnv("JWT_EXPIRATION", "24h"))
+	refreshExpiry, _ := time.ParseDuration(getEnv("SESSION_EXPIRATION", "168h")) // 7 days
+
+	return JWTConfig{
+		Secret:        getEnv("JWT_SECRET", "dev-jwt-secret"),
+		RefreshSecret: getEnv("JWT_REFRESH_SECRET", "dev-refresh-secret"),
+		AccessExpiry:  accessExpiry,
+		RefreshExpiry: refreshExpiry,
 	}
 }
 
