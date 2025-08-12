@@ -84,6 +84,29 @@ check_yq() {
     fi
 }
 
+# Function to check if goose is installed
+check_goose() {
+    if ! command -v goose &> /dev/null; then
+        print_error "goose is not installed. Please install it first:"
+        echo ""
+        echo "Install via Go:"
+        echo "  go install github.com/pressly/goose/v3/cmd/goose@latest"
+        echo ""
+        echo "On macOS:"
+        echo "  brew install goose"
+        echo ""
+        echo "On Linux:"
+        echo "  # Download from: https://github.com/pressly/goose/releases"
+        echo ""
+        echo "On Windows:"
+        echo "  # Download from: https://github.com/pressly/goose/releases"
+        echo ""
+        echo "After installation, make sure your GOPATH/bin is in your PATH"
+        echo ""
+        exit 1
+    fi
+}
+
 # Function to check if user is authenticated with DigitalOcean
 check_auth() {
     if ! doctl auth list &> /dev/null; then
@@ -109,6 +132,10 @@ check_prerequisites() {
     print_status "Checking yq (YAML processor)..."
     check_yq
     print_success "yq is available"
+    
+    print_status "Checking goose (database migration tool)..."
+    check_goose
+    print_success "goose is available"
     
     print_status "Checking DigitalOcean authentication..."
     check_auth
@@ -348,6 +375,7 @@ show_help() {
     echo "Prerequisites:"
     echo "  - doctl (DigitalOcean CLI)"
     echo "  - yq (YAML processor)"
+    echo "  - goose (database migration tool)"
     echo "  - DigitalOcean authentication"
     echo ""
 }
