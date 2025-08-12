@@ -1,0 +1,13 @@
+# Temporary files
+.temp
+
+# Compiled binaries
+bin/
+
+# Environment files
+.env.development
+.env.staging
+.env.production
+
+# DigitalOcean App Specs with secrets. Auto-generated when deployment.
+.do/
