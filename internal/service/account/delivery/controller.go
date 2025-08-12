@@ -4,9 +4,10 @@ import (
 	"go-server/internal/service/account/domain"
 	"go-server/internal/service/account/repository"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -26,7 +27,7 @@ func NewAccountController(db *gorm.DB, httpClient *http.Client) *Controller {
 
 func (ctl *Controller) CreateAccount(c *gin.Context) {
 	var req struct {
-		Username string `json:"username" binding:"required"`
+		FullName string `json:"full_name" binding:"required"`
 		Email    string `json:"email" binding:"required"`
 		Password string `json:"password" binding:"required"`
 	}
@@ -36,28 +37,53 @@ func (ctl *Controller) CreateAccount(c *gin.Context) {
 		return
 	}
 
-	account, err := ctl.UseCase.CreateAccount(domain.Account{
-		Username: req.Username,
-		Email:    domain.Email(req.Email),
-		Password: domain.Password(req.Password),
-	})
+	// Validate password strength
+	password := domain.Password(req.Password)
+	if !password.IsValid() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Password must be at least 8 characters long"})
+		return
+	}
 
+	// Validate email format
+	email := domain.Email(req.Email)
+	if !email.IsValid() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email format"})
+		return
+	}
+
+	// Hash the password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password.String()), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
+
+	account := domain.Account{
+		Email:         email,
+		PasswordHash:  string(hashedPassword),
+		FullName:      req.FullName,
+		IsActive:      true,
+		EmailVerified: false,
+	}
+
+	createdAccount, err := ctl.UseCase.CreateAccount(account)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, account)
+	c.JSON(http.StatusCreated, createdAccount)
 }
 
 func (ctl *Controller) DeleteAccount(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid account ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid account ID format"})
 		return
 	}
 
-	err = ctl.UseCase.DeleteAccount(uint(id))
+	err = ctl.UseCase.DeleteAccount(id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
