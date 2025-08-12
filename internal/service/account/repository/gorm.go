@@ -3,6 +3,7 @@ package repository
 import (
 	accountdomain "go-server/internal/service/account/domain"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -15,9 +16,12 @@ func NewGormRepository(db *gorm.DB) accountdomain.Repository {
 }
 
 func (d *Database) Create(account accountdomain.Account) (accountdomain.Account, error) {
-	return account, d.DB.Create(&account).Error
+	if err := d.DB.Create(&account).Error; err != nil {
+		return accountdomain.Account{}, err
+	}
+	return account, nil
 }
 
-func (d *Database) Delete(id uint) error {
-	return d.DB.Delete(&accountdomain.Account{ID: id}).Error
+func (d *Database) Delete(id uuid.UUID) error {
+	return d.DB.Delete(&accountdomain.Account{}, id).Error
 }
