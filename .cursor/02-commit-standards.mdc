@@ -1,0 +1,553 @@
+---
+description: Always check this file before making commit.
+alwaysApply: false
+---
+# Commit Standards
+⚠️ **CRITICAL**: Always check this file before making commit.
+
+## Commit Message Template
+
+### 1. Message Format
+Use this standardized commit message format:
+
+```
+<type>(<scope>): <description>
+
+<body>
+
+<footer>
+```
+
+### 2. Types
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `style`: Code style changes (formatting, etc.)
+- `refactor`: Code refactoring
+- `test`: Adding or updating tests
+- `chore`: Maintenance tasks, dependencies, etc.
+- `perf`: Performance improvements
+- `ci`: CI/CD changes
+- `build`: Build system changes
+
+### 3. Scope Examples
+- `user-service`: Changes to user service
+- `auth`: Authentication-related changes
+- `api`: API changes
+- `db`: Database changes
+- `docs`: Documentation changes
+
+### 4. Examples
+```
+feat(user-service): add user registration endpoint
+
+- Add POST /api/v1/users endpoint
+- Implement user validation
+- Add database migration for users table
+
+Closes #123
+```
+
+```
+fix(auth): resolve token validation issue
+
+- Fix JWT token validation logic
+- Add proper error handling for expired tokens
+- Update authentication middleware
+
+Fixes #456
+```
+
+## Commit Strategy
+
+### 1. Commit Order (Most Independent First)
+1. **Documentation changes** (docs, README updates)
+2. **Configuration changes** (config files, environment variables)
+3. **Domain layer changes** (entities, interfaces, business logic)
+4. **Infrastructure layer changes** (repositories, external integrations)
+5. **Application layer changes** (services, use cases)
+6. **Delivery layer changes** (handlers, routes)
+7. **Integration changes** (bootstrap, DI container)
+
+### 2. Commit Guidelines
+- **Each commit should be functionally complete** and not break the application
+- **Test each commit** to ensure it compiles and runs
+- **Keep commits focused** on a single change or feature
+- **Use meaningful commit messages** that explain the "why" not just the "what"
+- **Reference issues** in commit messages when applicable
+
+### 3. Commit Workflow
+```bash
+# 1. Start with most independent changes
+git add docs/01-architecture/clean-architecture.md
+git commit -m "docs(architecture): add clean architecture principles"
+
+# 2. Configuration changes
+git add config/database.yaml
+git commit -m "config(db): add database connection settings"
+
+# 3. Domain layer
+git add internal/services/user-service/domain/
+git commit -m "feat(user-service): add user domain entities and interfaces"
+
+# 4. Infrastructure layer
+git add internal/services/user-service/infrastructure/
+git commit -m "feat(user-service): implement user repository"
+
+# 5. Application layer
+git add internal/services/user-service/application/
+git commit -m "feat(user-service): add user service business logic"
+
+# 6. Delivery layer
+git add internal/services/user-service/delivery/
+git commit -m "feat(user-service): add HTTP handlers for user endpoints"
+
+# 7. Integration
+git add internal/bootstrap/di.go
+git commit -m "feat(bootstrap): register user service in DI container"
+```
+
+## Branch Strategy
+
+### 1. Branch Naming
+- `main`: Production-ready code
+- `develop`: Development branch
+- `feature/<feature-name>`: Feature branches
+- `bugfix/<bug-description>`: Bug fix branches
+- `hotfix/<issue-description>`: Hot fix branches
+
+### 2. Branch Workflow
+1. Create feature branch from `develop`
+2. Make changes and commit following standards
+3. Push branch and create pull request
+4. Review and merge to `develop`
+5. Merge `develop` to `main` for releases
+
+## Pull Request Guidelines
+
+### 1. PR Title
+- Use the same format as commit messages
+- Be descriptive and concise
+- Include scope and type
+
+### 2. PR Description
+- Describe the changes made
+- Include motivation for changes
+- List any breaking changes
+- Reference related issues
+
+### 3. PR Checklist
+- [ ] Code follows project conventions
+- [ ] Tests are included and passing
+- [ ] Documentation is updated
+- [ ] No linting errors
+- [ ] Performance impact considered
+- [ ] Security implications reviewed
+
+## Commit Commands
+
+### 1. Standard Commits
+```bash
+# Commit all changes per changes (individual commits)
+commit
+
+# Commit all changes at once
+commit once
+
+# Commit specific module/layer/context/feature
+commit user-service
+commit domain
+commit docs
+```
+
+### 2. Commit Examples
+```bash
+# Documentation
+git commit -m "docs(architecture): add clean architecture principles"
+
+# Configuration
+git commit -m "config(db): add database connection settings"
+
+# Domain layer
+git commit -m "feat(user-service): add user domain entities"
+
+# Infrastructure layer
+git commit -m "feat(user-service): implement user repository"
+
+# Application layer
+git commit -m "feat(user-service): add user service business logic"
+
+# Delivery layer
+git commit -m "feat(user-service): add HTTP handlers for user endpoints"
+
+# Integration
+git commit -m "feat(bootstrap): register user service in DI container"
+```
+
+## Best Practices
+
+### 1. Commit Size
+- Keep commits small and focused
+- One logical change per commit
+- Avoid mixing unrelated changes
+- Use meaningful commit messages
+
+### 2. Commit Frequency
+- Commit frequently during development
+- Don't let changes accumulate
+- Use feature branches for larger changes
+- Keep commits atomic
+
+### 3. Commit Messages
+- Use imperative mood ("add" not "added")
+- Be specific and descriptive
+- Include scope when relevant
+- Reference issues when applicable
+
+### 4. Commit History
+- Maintain clean, linear history
+- Use rebase to clean up commits
+- Squash commits when appropriate
+- Keep history meaningful
+
+## Common Patterns
+
+### 1. Feature Development
+```bash
+# Create feature branch
+git checkout -b feature/user-registration
+
+# Make changes and commit
+git add .
+git commit -m "feat(user-service): add user registration endpoint"
+
+# Push and create PR
+git push origin feature/user-registration
+```
+
+### 2. Bug Fixes
+```bash
+# Create bugfix branch
+git checkout -b bugfix/token-validation
+
+# Fix the issue
+git add .
+git commit -m "fix(auth): resolve token validation issue"
+
+# Push and create PR
+git push origin bugfix/token-validation
+```
+
+### 3. Documentation Updates
+```bash
+# Update documentation
+git add docs/
+git commit -m "docs(api): update user service API documentation"
+
+# Push changes
+git push origin develop
+```
+
+## Troubleshooting
+
+### 1. Common Issues
+- **Large commits**: Break into smaller, focused commits
+- **Mixed changes**: Separate unrelated changes into different commits
+- **Poor messages**: Use descriptive, imperative commit messages
+- **Missing scope**: Include relevant scope in commit messages
+
+### 2. Commit Amending
+```bash
+# Amend last commit message
+git commit --amend -m "feat(user-service): add user registration endpoint"
+
+# Amend last commit with additional changes
+git add .
+git commit --amend --no-edit
+```
+
+### 3. Commit History
+```bash
+# View commit history
+git log --oneline
+
+# View detailed commit history
+git log --graph --oneline --all
+
+# View changes in last commit
+git show
+```
+# Commit Standards
+
+## Commit Message Template
+
+### 1. Message Format
+Use this standardized commit message format:
+
+```
+<type>(<scope>): <description>
+
+<body>
+
+<footer>
+```
+
+### 2. Types
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `style`: Code style changes (formatting, etc.)
+- `refactor`: Code refactoring
+- `test`: Adding or updating tests
+- `chore`: Maintenance tasks, dependencies, etc.
+- `perf`: Performance improvements
+- `ci`: CI/CD changes
+- `build`: Build system changes
+
+### 3. Scope Examples
+- `user-service`: Changes to user service
+- `auth`: Authentication-related changes
+- `api`: API changes
+- `db`: Database changes
+- `docs`: Documentation changes
+
+### 4. Examples
+```
+feat(user-service): add user registration endpoint
+
+- Add POST /api/v1/users endpoint
+- Implement user validation
+- Add database migration for users table
+
+Closes #123
+```
+
+```
+fix(auth): resolve token validation issue
+
+- Fix JWT token validation logic
+- Add proper error handling for expired tokens
+- Update authentication middleware
+
+Fixes #456
+```
+
+## Commit Strategy
+
+### 1. Commit Order (Most Independent First)
+1. **Documentation changes** (docs, README updates)
+2. **Configuration changes** (config files, environment variables)
+3. **Domain layer changes** (entities, interfaces, business logic)
+4. **Infrastructure layer changes** (repositories, external integrations)
+5. **Application layer changes** (services, use cases)
+6. **Delivery layer changes** (handlers, routes)
+7. **Integration changes** (bootstrap, DI container)
+
+### 2. Commit Guidelines
+- **Each commit should be functionally complete** and not break the application
+- **Test each commit** to ensure it compiles and runs
+- **Keep commits focused** on a single change or feature
+- **Use meaningful commit messages** that explain the "why" not just the "what"
+- **Reference issues** in commit messages when applicable
+
+### 3. Commit Workflow
+```bash
+# 1. Start with most independent changes
+git add docs/01-architecture/clean-architecture.md
+git commit -m "docs(architecture): add clean architecture principles"
+
+# 2. Configuration changes
+git add config/database.yaml
+git commit -m "config(db): add database connection settings"
+
+# 3. Domain layer
+git add internal/services/user-service/domain/
+git commit -m "feat(user-service): add user domain entities and interfaces"
+
+# 4. Infrastructure layer
+git add internal/services/user-service/infrastructure/
+git commit -m "feat(user-service): implement user repository"
+
+# 5. Application layer
+git add internal/services/user-service/application/
+git commit -m "feat(user-service): add user service business logic"
+
+# 6. Delivery layer
+git add internal/services/user-service/delivery/
+git commit -m "feat(user-service): add HTTP handlers for user endpoints"
+
+# 7. Integration
+git add internal/bootstrap/di.go
+git commit -m "feat(bootstrap): register user service in DI container"
+```
+
+## Branch Strategy
+
+### 1. Branch Naming
+- `main`: Production-ready code
+- `develop`: Development branch
+- `feature/<feature-name>`: Feature branches
+- `bugfix/<bug-description>`: Bug fix branches
+- `hotfix/<issue-description>`: Hot fix branches
+
+### 2. Branch Workflow
+1. Create feature branch from `develop`
+2. Make changes and commit following standards
+3. Push branch and create pull request
+4. Review and merge to `develop`
+5. Merge `develop` to `main` for releases
+
+## Pull Request Guidelines
+
+### 1. PR Title
+- Use the same format as commit messages
+- Be descriptive and concise
+- Include scope and type
+
+### 2. PR Description
+- Describe the changes made
+- Include motivation for changes
+- List any breaking changes
+- Reference related issues
+
+### 3. PR Checklist
+- [ ] Code follows project conventions
+- [ ] Tests are included and passing
+- [ ] Documentation is updated
+- [ ] No linting errors
+- [ ] Performance impact considered
+- [ ] Security implications reviewed
+
+## Commit Commands
+
+### 1. Standard Commits
+```bash
+# Commit all changes per changes (individual commits)
+commit
+
+# Commit all changes at once
+commit once
+
+# Commit specific module/layer/context/feature
+commit user-service
+commit domain
+commit docs
+```
+
+### 2. Commit Examples
+```bash
+# Documentation
+git commit -m "docs(architecture): add clean architecture principles"
+
+# Configuration
+git commit -m "config(db): add database connection settings"
+
+# Domain layer
+git commit -m "feat(user-service): add user domain entities"
+
+# Infrastructure layer
+git commit -m "feat(user-service): implement user repository"
+
+# Application layer
+git commit -m "feat(user-service): add user service business logic"
+
+# Delivery layer
+git commit -m "feat(user-service): add HTTP handlers for user endpoints"
+
+# Integration
+git commit -m "feat(bootstrap): register user service in DI container"
+```
+
+## Best Practices
+
+### 1. Commit Size
+- Keep commits small and focused
+- One logical change per commit
+- Avoid mixing unrelated changes
+- Use meaningful commit messages
+
+### 2. Commit Frequency
+- Commit frequently during development
+- Don't let changes accumulate
+- Use feature branches for larger changes
+- Keep commits atomic
+
+### 3. Commit Messages
+- Use imperative mood ("add" not "added")
+- Be specific and descriptive
+- Include scope when relevant
+- Reference issues when applicable
+
+### 4. Commit History
+- Maintain clean, linear history
+- Use rebase to clean up commits
+- Squash commits when appropriate
+- Keep history meaningful
+
+## Common Patterns
+
+### 1. Feature Development
+```bash
+# Create feature branch
+git checkout -b feature/user-registration
+
+# Make changes and commit
+git add .
+git commit -m "feat(user-service): add user registration endpoint"
+
+# Push and create PR
+git push origin feature/user-registration
+```
+
+### 2. Bug Fixes
+```bash
+# Create bugfix branch
+git checkout -b bugfix/token-validation
+
+# Fix the issue
+git add .
+git commit -m "fix(auth): resolve token validation issue"
+
+# Push and create PR
+git push origin bugfix/token-validation
+```
+
+### 3. Documentation Updates
+```bash
+# Update documentation
+git add docs/
+git commit -m "docs(api): update user service API documentation"
+
+# Push changes
+git push origin develop
+```
+
+## Troubleshooting
+
+### 1. Common Issues
+- **Large commits**: Break into smaller, focused commits
+- **Mixed changes**: Separate unrelated changes into different commits
+- **Poor messages**: Use descriptive, imperative commit messages
+- **Missing scope**: Include relevant scope in commit messages
+
+### 2. Commit Amending
+```bash
+# Amend last commit message
+git commit --amend -m "feat(user-service): add user registration endpoint"
+
+# Amend last commit with additional changes
+git add .
+git commit --amend --no-edit
+```
+
+### 3. Commit History
+```bash
+# View commit history
+git log --oneline
+
+# View detailed commit history
+git log --graph --oneline --all
+
+# View changes in last commit
+git show
+```

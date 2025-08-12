@@ -1,0 +1,50 @@
+---
+description: The `.temp` directory is a hidden folder used for temporary files and testing purposes.
+alwaysApply: false
+---
+# Temporary Folder Rules (/.temp)
+
+## Overview
+The `.temp` directory is a hidden folder used for temporary files and testing purposes.
+
+## Rules
+
+1. **Location**: Always use `/.temp` directory for temporary files
+2. **Access**: Access via terminal commands, not file reading tools
+3. **Purpose**: 
+   - Temporary files
+   - Test cases
+   - Non-business logic tests
+   - Temporary unit tests
+4. **Scope**: Separate temporary tests that are not relevant to business logic or fixed technical logic
+5. **Cleanup**: Temporary files should be cleaned up after use
+6. **Hidden**: Directory is hidden and should remain hidden
+
+## Usage
+- Create temporary files in `/.temp`
+- Use for isolated testing scenarios
+- Keep separate from main business logic
+- Clean up after completion
+# Temporary Folder Rules (/.temp)
+
+## Overview
+The `.temp` directory is a hidden folder used for temporary files and testing purposes.
+
+## Rules
+
+1. **Location**: Always use `/.temp` directory for temporary files
+2. **Access**: Access via terminal commands, not file reading tools
+3. **Purpose**: 
+   - Temporary files
+   - Test cases
+   - Non-business logic tests
+   - Temporary unit tests
+4. **Scope**: Separate temporary tests that are not relevant to business logic or fixed technical logic
+5. **Cleanup**: Temporary files should be cleaned up after use
+6. **Hidden**: Directory is hidden and should remain hidden
+
+## Usage
+- Create temporary files in `/.temp`
+- Use for isolated testing scenarios
+- Keep separate from main business logic
+- Clean up after completion

@@ -1,0 +1,219 @@
+---
+description: Always check this file before making new service or refactoring existing service.
+alwaysApply: false
+---
+# Go Server Service Template Context
+
+## Service Architecture Overview
+
+This project follows Clean Architecture principles with a layered structure for each service. Each service is self-contained with its own domain logic, delivery layer, and data access layer.
+
+## Service Structure Pattern
+
+Every service follows this consistent directory structure:
+```
+internal/service/{service-name}/
+├── app.go                 # Service registration and dependency injection
+├── domain/                # Business logic and domain models
+│   ├── entity.go         # Core domain entities and types
+│   ├── usecase.go        # Business logic implementation
+│   └── repository.go     # Repository interface definitions
+├── delivery/              # HTTP layer and routing
+│   ├── controller.go     # HTTP request handlers
+│   └── router.go         # Route definitions and middleware
+├── repository/            # Data access implementation
+│   └── gorm.go          # GORM-specific database operations
+├── dto/                  # Data Transfer Objects (currently minimal)
+│   └── dto.go           # Request/response data structures
+└── README.md             # Service documentation
+```
+
+## Core Architecture Principles
+
+### 1. Clean Architecture Layers
+- **Domain Layer**: Pure business logic, no external dependencies
+- **Use Case Layer**: Orchestrates domain operations and repository calls
+- **Delivery Layer**: HTTP handling, request/response formatting
+- **Repository Layer**: Data access abstraction and implementation
+
+### 2. Dependency Injection Pattern
+- Services are registered in `main.go` with database and HTTP client dependencies
+- Controllers receive dependencies through constructor injection
+- Repository implementations are created within controllers
+
+### 3. Interface Segregation
+- Repository interfaces defined in domain layer
+- Concrete implementations in repository layer
+- Use case layer depends on repository interfaces, not implementations
+
+## Code Patterns and Conventions
+
+### Entity Design
+```go
+type Entity struct {
+    ID       uint
+    // Core fields with domain-specific types
+}
+
+// Domain-specific types with validation methods
+type Email string
+func (e Email) IsValid() bool { /* validation logic */ }
+```
+
+### Use Case Implementation
+```go
+type UseCase struct {
+    Repo Repository
+}
+
+func NewUseCase(repo Repository) *UseCase {
+    return &UseCase{Repo: repo}
+}
+
+func (uc *UseCase) BusinessOperation(entity Entity) (Entity, error) {
+    return uc.Repo.Create(entity)
+}
+```
+
+### Repository Interface
+```go
+type Repository interface {
+    Create(entity Entity) (Entity, error)
+    Delete(id uint) error
+    // Other CRUD operations
+}
+```
+
+### Controller Pattern
+```go
+type Controller struct {
+    UseCase    *domain.UseCase
+    HTTPClient *http.Client
+}
+
+func NewController(db *gorm.DB, httpClient *http.Client) *Controller {
+    repo := repository.NewGormRepository(db)
+    useCase := domain.NewUseCase(repo)
+    return &Controller{
+        UseCase:    useCase,
+        HTTPClient: httpClient,
+    }
+}
+
+func (ctl *Controller) Handler(c *gin.Context) {
+    // 1. Parse request
+    // 2. Validate input
+    // 3. Call use case
+    // 4. Handle response/errors
+}
+```
+
+### Router Configuration
+```go
+const (
+    servicePath = "/{resource}"
+    createPath  = "/"
+    deletePath  = "/:id"
+)
+
+type Router struct {
+    routerGroup *gin.RouterGroup
+}
+
+func NewRouter(router *gin.Engine) *Router {
+    routerGroup := router.Group(servicePath)
+    return &Router{routerGroup: routerGroup}
+}
+```
+
+## Service Registration Pattern
+
+```go
+func RegisterService(r *gin.Engine, db *gorm.DB, httpClient *http.Client) {
+    controller := delivery.NewController(db, httpClient)
+    router := delivery.NewRouter(r)
+    
+    // Register routes with handlers
+    router.CreateResource(controller.CreateResource)
+    router.DeleteResource(controller.DeleteResource)
+}
+```
+
+## Database Integration
+
+- **ORM**: GORM for PostgreSQL operations
+- **Connection**: Centralized database connection in infrastructure layer
+- **Transactions**: Repository methods handle database operations
+- **Error Handling**: Database errors are propagated up the stack
+
+## HTTP Layer
+
+- **Framework**: Gin for routing and middleware
+- **Port**: Standard port 8080
+- **Middleware**: Gin default middleware stack
+- **Error Handling**: Consistent JSON error responses
+- **Validation**: Gin binding for request validation
+
+## Dependencies and Imports
+
+### Standard Dependencies
+- `github.com/gin-gonic/gin` - HTTP framework
+- `gorm.io/gorm` - Database ORM
+- `net/http` - HTTP client for external services
+
+### Project Imports
+- `go-server/internal/service/{service}/domain`
+- `go-server/internal/service/{service}/delivery`
+- `go-server/internal/service/{service}/repository`
+
+## Error Handling Patterns
+
+### HTTP Response Format
+```go
+// Success
+c.JSON(http.StatusCreated, entity)
+
+// Error
+c.JSON(http.StatusBadRequest, gin.H{"error": "Error message"})
+c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+```
+
+### Validation Errors
+- Request binding errors return 400 Bad Request
+- Business logic errors return 500 Internal Server Error
+- Database errors are logged and return 500
+
+## Testing Considerations
+
+- Unit tests should focus on domain logic
+- Integration tests for repository layer
+- Controller tests for HTTP handling
+- Use `.temp` directory for temporary test files
+- Mock external dependencies (HTTP client, database)
+
+## Security Patterns
+
+- Input validation through Gin binding
+- Type-safe domain objects
+- Repository pattern prevents SQL injection
+- HTTP client for external API calls (ready for authentication)
+
+## Scalability Features
+
+- Clean separation of concerns
+- Interface-based design for easy mocking
+- Centralized dependency injection
+- Consistent error handling
+- Ready for middleware integration
+
+## Documentation Standards
+
+### README Structure
+1. **Overview** - Service purpose and capabilities
+2. **Architecture** - Clean architecture diagram
+3. **API Endpoints** - Available routes and methods
+4. **Dependencies** - External services and databases
+5. **Features** - Key functionality
+6. **Data Models** - Domain entities and types
+
+This template ensures consistency across all services while maintaining clean architecture principles and Go best practices.

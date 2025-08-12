@@ -1,0 +1,144 @@
+---
+alwaysApply: true
+---
+
+# General Development Rules
+
+## Code Quality & Go Idioms
+- Write simple, self-documenting code with clear logic
+- Follow Go best practices and idioms (effective Go)
+- Use meaningful variable and function names that explain intent
+- Keep functions small and focused (single responsibility)
+- Prefer composition over inheritance
+- Use Go's standard library when possible
+- Follow Go naming conventions (camelCase, PascalCase for exported)
+- Use interfaces sparingly and only when they add real value
+
+## Documentation Philosophy
+- **MINIMUM documentation approach** - only document what's absolutely necessary
+- Single README.md per module with overview section first
+- Inline code comments only for complex business logic or non-obvious decisions
+- No extensive API documentation unless required for external consumers
+- Prefer self-documenting code over comments
+
+## Architecture & Structure
+- Keep current layer structure (domain, service, delivery, repository) - no changes
+- **NO over-engineering** - implement only what's needed right now
+- Follow KISS principle (Keep It Simple, Stupid)
+- Avoid premature optimization and abstraction
+- Use simple, flat folder structures when possible
+- Prefer direct, straightforward implementations over complex patterns
+
+## Human-Friendly Development
+- Write code that a human developer can understand immediately
+- Avoid AI-generated complexity and over-abstracted patterns
+- Use familiar, standard Go patterns that developers expect
+- Keep dependencies minimal and well-known
+- Prefer explicit over implicit behavior
+- Use clear error handling with meaningful error messages
+
+## Code Standards
+- Use `go fmt` for consistent formatting
+- Follow Go linting rules (golangci-lint)
+- Use meaningful commit messages
+- Keep functions under 20 lines when possible
+- Use early returns to reduce nesting
+- Handle errors explicitly and return them up the call stack
+
+## Testing
+- Write simple, focused tests for business logic
+- Use table-driven tests for multiple scenarios
+- Mock external dependencies only when necessary
+- Keep tests readable and maintainable
+- Test the "what" not the "how"
+
+## Performance & Scalability
+- Optimize only when there's a measured performance problem
+- Use simple, proven solutions over complex optimizations
+- Profile before optimizing
+- Prefer readability over micro-optimizations
+
+## Security
+- Follow Go security best practices
+- Use prepared statements for database queries
+- Validate and sanitize all inputs
+- Use environment variables for configuration
+- Keep dependencies updated
+
+## Remember
+- **Simple is better than complex**
+- **Readability counts**
+- **Explicit is better than implicit**
+- **This is a Go project, not an enterprise framework**
+- **Write code for humans, not for AI**
+- **Just enough is better than perfect**
+# General Development Rules
+
+## Code Quality & Go Idioms
+- Write simple, self-documenting code with clear logic
+- Follow Go best practices and idioms (effective Go)
+- Use meaningful variable and function names that explain intent
+- Keep functions small and focused (single responsibility)
+- Prefer composition over inheritance
+- Use Go's standard library when possible
+- Follow Go naming conventions (camelCase, PascalCase for exported)
+- Use interfaces sparingly and only when they add real value
+
+## Documentation Philosophy
+- **MINIMUM documentation approach** - only document what's absolutely necessary
+- Single README.md per module with overview section first
+- Inline code comments only for complex business logic or non-obvious decisions
+- No extensive API documentation unless required for external consumers
+- Prefer self-documenting code over comments
+
+## Architecture & Structure
+- Keep current layer structure (domain, service, delivery, repository) - no changes
+- **NO over-engineering** - implement only what's needed right now
+- Follow KISS principle (Keep It Simple, Stupid)
+- Avoid premature optimization and abstraction
+- Use simple, flat folder structures when possible
+- Prefer direct, straightforward implementations over complex patterns
+
+## Human-Friendly Development
+- Write code that a human developer can understand immediately
+- Avoid AI-generated complexity and over-abstracted patterns
+- Use familiar, standard Go patterns that developers expect
+- Keep dependencies minimal and well-known
+- Prefer explicit over implicit behavior
+- Use clear error handling with meaningful error messages
+
+## Code Standards
+- Use `go fmt` for consistent formatting
+- Follow Go linting rules (golangci-lint)
+- Use meaningful commit messages
+- Keep functions under 20 lines when possible
+- Use early returns to reduce nesting
+- Handle errors explicitly and return them up the call stack
+
+## Testing
+- Write simple, focused tests for business logic
+- Use table-driven tests for multiple scenarios
+- Mock external dependencies only when necessary
+- Keep tests readable and maintainable
+- Test the "what" not the "how"
+
+## Performance & Scalability
+- Optimize only when there's a measured performance problem
+- Use simple, proven solutions over complex optimizations
+- Profile before optimizing
+- Prefer readability over micro-optimizations
+
+## Security
+- Follow Go security best practices
+- Use prepared statements for database queries
+- Validate and sanitize all inputs
+- Use environment variables for configuration
+- Keep dependencies updated
+
+## Remember
+- **Simple is better than complex**
+- **Readability counts**
+- **Explicit is better than implicit**
+- **This is a Go project, not an enterprise framework**
+- **Write code for humans, not for AI**
+- **Just enough is better than perfect**
