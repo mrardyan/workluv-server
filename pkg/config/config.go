@@ -16,6 +16,7 @@ type Config struct {
 	Log      LogConfig
 	JWT      JWTConfig
 	CORS     CORSConfig
+	Email    EmailConfig
 }
 
 // DatabaseConfig holds database configuration
@@ -60,6 +61,21 @@ type CORSConfig struct {
 	AllowedOrigins []string
 }
 
+// EmailConfig holds email service configuration
+type EmailConfig struct {
+	Enabled      bool
+	Provider     string
+	SMTPHost     string
+	SMTPPort     int
+	SMTPUsername string
+	SMTPPassword string
+	UseTLS       bool
+	UseSSL       bool
+	FromAddress  string
+	FromName     string
+	TemplateDir  string
+}
+
 // Load loads configuration from environment variables
 func Load() *Config {
 	config := &Config{
@@ -69,6 +85,7 @@ func Load() *Config {
 		Log:      loadLogConfig(),
 		JWT:      loadJWTConfig(),
 		CORS:     loadCORSConfig(),
+		Email:    loadEmailConfig(),
 	}
 
 	// Build DATABASE_URL from individual components
@@ -143,6 +160,27 @@ func loadCORSConfig() CORSConfig {
 
 	return CORSConfig{
 		AllowedOrigins: allowedOrigins,
+	}
+}
+
+func loadEmailConfig() EmailConfig {
+	port, _ := strconv.Atoi(getEnv("EMAIL_SMTP_PORT", "587"))
+	enabled, _ := strconv.ParseBool(getEnv("EMAIL_SERVICE_ENABLED", "false"))
+	useTLS, _ := strconv.ParseBool(getEnv("EMAIL_SMTP_USE_TLS", "true"))
+	useSSL, _ := strconv.ParseBool(getEnv("EMAIL_SMTP_USE_SSL", "false"))
+
+	return EmailConfig{
+		Enabled:      enabled,
+		Provider:     getEnv("EMAIL_SERVICE_PROVIDER", "smtp"),
+		SMTPHost:     getEnv("EMAIL_SMTP_HOST", "localhost"),
+		SMTPPort:     port,
+		SMTPUsername: getEnv("EMAIL_SMTP_USERNAME", ""),
+		SMTPPassword: getEnv("EMAIL_SMTP_PASSWORD", ""),
+		UseTLS:       useTLS,
+		UseSSL:       useSSL,
+		FromAddress:  getEnv("EMAIL_FROM_ADDRESS", "noreply@localhost.com"),
+		FromName:     getEnv("EMAIL_FROM_NAME", "Go Server"),
+		TemplateDir:  getEnv("EMAIL_TEMPLATE_DIR", "src/email"),
 	}
 }
 
