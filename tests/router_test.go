@@ -141,9 +141,9 @@ func testAccountServiceRoutes(t *testing.T, server *httptest.Server) {
 			method:   "POST",
 			endpoint: "/accounts/",
 			payload: map[string]string{
-				"username": "testuser",
-				"email":    "test@example.com",
-				"password": "password123",
+				"full_name": "Test User",
+				"email":     "test@example.com",
+				"password":  "password123",
 			},
 			expectedStatus: []int{http.StatusCreated, http.StatusInternalServerError}, // May fail due to DB constraints
 		},
