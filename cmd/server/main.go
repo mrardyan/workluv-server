@@ -49,7 +49,7 @@ func main() {
 	}
 
 	// Setup logger based on configuration
-	logger.SetupLogger(cfg)
+	logger.New(cfg.Log)
 
 	log.Println("Starting Workluv server...")
 

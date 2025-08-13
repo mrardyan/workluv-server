@@ -34,7 +34,7 @@ func TestRouterConnections(t *testing.T) {
 	}
 
 	// Setup logger for testing
-	logger.SetupLogger(cfg)
+	logger.New(cfg.Log)
 
 	// Mock database and Redis connections for testing
 	// Note: In a real test environment, you'd want to use test databases

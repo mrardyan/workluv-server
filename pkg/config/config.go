@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 // Environment types
@@ -144,7 +146,24 @@ type EmailConfig struct {
 
 // Load loads configuration from environment variables with validation
 func Load() (*Config, error) {
-	// Get environment from ENVIRONMENT variable
+	// Load environment file based on ENVIRONMENT variable
+	env := os.Getenv("ENVIRONMENT")
+	if env == "" {
+		env = EnvironmentDevelopment
+	}
+
+	// Load environment files in order of priority
+	// 1. Load config file first (template with empty values)
+	envFile := fmt.Sprintf("config/%s.env", env)
+	if err := godotenv.Load(envFile); err != nil {
+		fmt.Printf("Warning: Could not load %s\n", envFile)
+	}
+
+	// 2. Load root .env file to override empty values
+	if err := godotenv.Load(); err != nil {
+		fmt.Printf("Warning: No root .env file found\n")
+	}
+
 	environment := getEnv("ENVIRONMENT", EnvironmentDevelopment)
 
 	// Validate environment
