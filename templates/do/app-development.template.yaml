@@ -3,7 +3,7 @@ services:
   - name: workluv
     source_dir: /
     github:
-      repo: heymasthead/workluv-server
+      repo: mrardyan/workluv-server
       branch: develop
       deploy_on_push: true
     dockerfile_path: /Dockerfile

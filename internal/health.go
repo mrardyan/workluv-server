@@ -19,6 +19,7 @@ type HealthResponse struct {
 
 // RegisterHealthRoutes registers health check endpoints
 func RegisterHealthRoutes(router *gin.Engine, db *sql.DB, redisClient *redis.Client) {
+	// Main health check endpoint (includes all service checks)
 	router.GET("/health", func(c *gin.Context) {
 		health := HealthResponse{
 			Status:    "healthy",
@@ -50,9 +51,47 @@ func RegisterHealthRoutes(router *gin.Engine, db *sql.DB, redisClient *redis.Cli
 		}
 	})
 
-	// Simple health check endpoint
+	// Simple health check endpoint (for basic connectivity)
 	router.GET("/health/simple", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
+	// Liveness probe endpoint (for Kubernetes/DO App Platform)
+	router.GET("/health/live", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "alive"})
+	})
+
+	// Readiness probe endpoint (for Kubernetes/DO App Platform)
+	router.GET("/health/ready", func(c *gin.Context) {
+		// Check if the application is ready to serve traffic
+		health := HealthResponse{
+			Status:    "ready",
+			Timestamp: time.Now(),
+			Services:  make(map[string]string),
+		}
+
+		// Check database readiness
+		if err := checkDatabaseHealth(db); err != nil {
+			health.Status = "not_ready"
+			health.Services["database"] = "not_ready: " + err.Error()
+		} else {
+			health.Services["database"] = "ready"
+		}
+
+		// Check Redis readiness
+		if err := checkRedisHealth(redisClient); err != nil {
+			health.Status = "not_ready"
+			health.Services["redis"] = "not_ready: " + err.Error()
+		} else {
+			health.Services["redis"] = "ready"
+		}
+
+		// Set appropriate HTTP status code
+		if health.Status == "ready" {
+			c.JSON(http.StatusOK, health)
+		} else {
+			c.JSON(http.StatusServiceUnavailable, health)
+		}
 	})
 }
 

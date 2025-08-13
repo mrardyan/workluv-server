@@ -22,8 +22,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/server
 # Final stage
 FROM alpine:latest
 
-# Install ca-certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates
+# Install ca-certificates and wget for health checks
+RUN apk --no-cache add ca-certificates wget
 
 # Create non-root user
 RUN addgroup -g 1001 -S appgroup && \
@@ -32,8 +32,12 @@ RUN addgroup -g 1001 -S appgroup && \
 # Set working directory
 WORKDIR /app
 
-# Copy binary from builder stage
+# Copy binary and startup script from builder stage
 COPY --from=builder /app/main .
+COPY --from=builder /app/scripts/start.sh .
+
+# Make startup script executable
+RUN chmod +x start.sh
 
 # Change ownership to non-root user
 RUN chown -R appuser:appgroup /app
@@ -44,5 +48,9 @@ USER appuser
 # Expose port
 EXPOSE 8080
 
-# Run the application
-CMD ["./main"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health/simple || exit 1
+
+# Run the application using startup script
+CMD ["./start.sh"]

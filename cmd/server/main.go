@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"go-server/internal"
 	"go-server/internal/infrastructure"
 	"go-server/internal/service/account"
@@ -9,6 +10,11 @@ import (
 	"go-server/pkg/config"
 	"go-server/pkg/logger"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 )
 
 func main() {
@@ -52,11 +58,35 @@ func main() {
 	session.RegisterSessionService(router, db, cfg)
 	workspace.RegisterWorkspaceService(router, db, httpClient)
 
-	// Step 7: Start the HTTP server on the configured port and listen for incoming requests.
-	// If the server fails to start, log the error and terminate the application.
+	// Step 7: Create HTTP server with graceful shutdown
 	serverAddr := ":" + cfg.Server.Port
-	log.Printf("Server is starting on port %s", serverAddr)
-	if err := router.Run(serverAddr); err != nil {
-		log.Fatalf("Failed to start the HTTP server: %v", err)
+	server := &http.Server{
+		Addr:    serverAddr,
+		Handler: router,
 	}
+
+	// Start server in a goroutine
+	go func() {
+		log.Printf("Server is starting on port %s", serverAddr)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Failed to start the HTTP server: %v", err)
+		}
+	}()
+
+	// Wait for interrupt signal to gracefully shutdown the server
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Println("Shutting down server...")
+
+	// Create a deadline for server shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Attempt graceful shutdown
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatal("Server forced to shutdown:", err)
+	}
+
+	log.Println("Server exited")
 }

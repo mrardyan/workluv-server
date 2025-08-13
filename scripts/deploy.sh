@@ -286,7 +286,7 @@ deploy_app() {
     case "$environment" in
         "dev")
             spec_file=".do/app-development.yaml"
-            app_name="go-server-dev"
+            app_name="workluv-dev"
             env_file=".env.development"
             ;;
         "staging")
