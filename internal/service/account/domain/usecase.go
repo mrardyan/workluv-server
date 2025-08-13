@@ -26,13 +26,13 @@ func NewUseCase(repo Repository, emailService infrastructure.EmailService, cfg *
 
 func (uc *UseCase) CreateAccount(ctx context.Context, account Account) (Account, error) {
 	// Create account in database first
-	createdAccount, err := uc.Repo.Create(account)
+	createdAccount, err := uc.Repo.Create(ctx, account)
 	if err != nil {
 		return Account{}, err
 	}
 
 	// Check if there's already a verification for this account
-	existingVerification, err := uc.Repo.FindByAccountID(createdAccount.ID)
+	existingVerification, err := uc.Repo.FindByAccountID(ctx, createdAccount.ID)
 	if err != nil {
 		// No existing verification, create a new one
 		verification, err := NewEmailVerification(createdAccount.ID)
@@ -41,7 +41,7 @@ func (uc *UseCase) CreateAccount(ctx context.Context, account Account) (Account,
 		}
 
 		// Save verification to database
-		_, err = uc.Repo.CreateVerification(*verification)
+		_, err = uc.Repo.CreateVerification(ctx, *verification)
 		if err != nil {
 			return Account{}, fmt.Errorf("failed to save verification: %w", err)
 		}
@@ -66,7 +66,7 @@ func (uc *UseCase) CreateAccount(ctx context.Context, account Account) (Account,
 			return Account{}, fmt.Errorf("failed to generate verification token: %w", err)
 		}
 
-		_, err = uc.Repo.UpdateVerification(existingVerification)
+		_, err = uc.Repo.UpdateVerification(ctx, existingVerification)
 		if err != nil {
 			return Account{}, fmt.Errorf("failed to update verification: %w", err)
 		}
@@ -92,7 +92,7 @@ func (uc *UseCase) CreateAccount(ctx context.Context, account Account) (Account,
 
 func (uc *UseCase) VerifyEmail(ctx context.Context, token string) error {
 	// Find verification by token
-	verification, err := uc.Repo.FindByToken(token)
+	verification, err := uc.Repo.FindByToken(ctx, token)
 	if err != nil {
 		return fmt.Errorf("invalid verification token")
 	}
@@ -106,19 +106,19 @@ func (uc *UseCase) VerifyEmail(ctx context.Context, token string) error {
 	verification.MarkAsCompleted()
 
 	// Update verification in database
-	_, err = uc.Repo.UpdateVerification(verification)
+	_, err = uc.Repo.UpdateVerification(ctx, verification)
 	if err != nil {
 		return fmt.Errorf("failed to update verification: %w", err)
 	}
 
 	// Update account to mark email as verified
-	account, err := uc.Repo.FindByID(verification.AccountID)
+	account, err := uc.Repo.FindByID(ctx, verification.AccountID)
 	if err != nil {
 		return fmt.Errorf("failed to find account: %w", err)
 	}
 
 	account.EmailVerified = true
-	_, err = uc.Repo.Update(account)
+	_, err = uc.Repo.Update(ctx, account)
 	if err != nil {
 		return fmt.Errorf("failed to update account: %w", err)
 	}
@@ -128,7 +128,7 @@ func (uc *UseCase) VerifyEmail(ctx context.Context, token string) error {
 
 func (uc *UseCase) ResendVerificationEmail(ctx context.Context, email Email) error {
 	// Find account by email
-	account, err := uc.Repo.FindByEmail(email)
+	account, err := uc.Repo.FindByEmail(ctx, email)
 	if err != nil {
 		return fmt.Errorf("account not found")
 	}
@@ -139,14 +139,14 @@ func (uc *UseCase) ResendVerificationEmail(ctx context.Context, email Email) err
 	}
 
 	// Check if there's already a verification for this account
-	existingVerification, err := uc.Repo.FindByAccountID(account.ID)
+	existingVerification, err := uc.Repo.FindByAccountID(ctx, account.ID)
 	if err == nil {
 		// Update existing verification with new token
 		if err := existingVerification.GenerateToken(); err != nil {
 			return fmt.Errorf("failed to generate verification token: %w", err)
 		}
 
-		_, err = uc.Repo.UpdateVerification(existingVerification)
+		_, err = uc.Repo.UpdateVerification(ctx, existingVerification)
 		if err != nil {
 			return fmt.Errorf("failed to update verification: %w", err)
 		}
@@ -175,7 +175,7 @@ func (uc *UseCase) ResendVerificationEmail(ctx context.Context, email Email) err
 	}
 
 	// Save verification to database
-	_, err = uc.Repo.CreateVerification(*verification)
+	_, err = uc.Repo.CreateVerification(ctx, *verification)
 	if err != nil {
 		return fmt.Errorf("failed to save verification: %w", err)
 	}
@@ -197,6 +197,6 @@ func (uc *UseCase) ResendVerificationEmail(ctx context.Context, email Email) err
 	return nil
 }
 
-func (uc *UseCase) DeleteAccount(id uuid.UUID) error {
-	return uc.Repo.Delete(id)
+func (uc *UseCase) DeleteAccount(ctx context.Context, id uuid.UUID) error {
+	return uc.Repo.Delete(ctx, id)
 }

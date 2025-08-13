@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"context"
 	"errors"
 	accountDomain "go-server/internal/service/account/domain"
 	"go-server/internal/shared"
@@ -48,9 +49,9 @@ type LoginResponse struct {
 }
 
 // Login authenticates user and creates a new session
-func (uc *UseCase) Login(req LoginRequest) (*LoginResponse, error) {
+func (uc *UseCase) Login(ctx context.Context, req LoginRequest) (*LoginResponse, error) {
 	// Find account by email (assuming FindByEmail exists in account repository)
-	account, err := uc.findAccountByEmail(req.Email)
+	account, err := uc.findAccountByEmail(ctx, req.Email)
 	if err != nil {
 		return nil, ErrInvalidCredentials
 	}
@@ -76,7 +77,7 @@ func (uc *UseCase) Login(req LoginRequest) (*LoginResponse, error) {
 		UpdatedAt:    shared.Now(),
 	}
 
-	_, err = uc.sessionRepo.Create(session)
+	_, err = uc.sessionRepo.Create(ctx, session)
 	if err != nil {
 		return nil, err
 	}
@@ -90,8 +91,8 @@ func (uc *UseCase) Login(req LoginRequest) (*LoginResponse, error) {
 }
 
 // Logout revokes a specific session
-func (uc *UseCase) Logout(refreshToken string) error {
-	session, err := uc.sessionRepo.FindByRefreshToken(refreshToken)
+func (uc *UseCase) Logout(ctx context.Context, refreshToken string) error {
+	session, err := uc.sessionRepo.FindByRefreshToken(ctx, refreshToken)
 	if err != nil {
 		return ErrSessionNotFound
 	}
@@ -100,16 +101,16 @@ func (uc *UseCase) Logout(refreshToken string) error {
 		return ErrSessionRevoked
 	}
 
-	return uc.sessionRepo.RevokeByID(session.ID)
+	return uc.sessionRepo.RevokeByID(ctx, session.ID)
 }
 
 // LogoutAll revokes all sessions for a user
-func (uc *UseCase) LogoutAll(accountID uuid.UUID) error {
-	return uc.sessionRepo.RevokeAllByAccountID(accountID)
+func (uc *UseCase) LogoutAll(ctx context.Context, accountID uuid.UUID) error {
+	return uc.sessionRepo.RevokeAllByAccountID(ctx, accountID)
 }
 
 // RefreshToken generates a new access token using a valid refresh token
-func (uc *UseCase) RefreshToken(refreshToken string) (*jwt.TokenPair, error) {
+func (uc *UseCase) RefreshToken(ctx context.Context, refreshToken string) (*jwt.TokenPair, error) {
 	// Validate refresh token
 	claims, err := uc.jwtService.ValidateRefreshToken(refreshToken)
 	if err != nil {
@@ -117,7 +118,7 @@ func (uc *UseCase) RefreshToken(refreshToken string) (*jwt.TokenPair, error) {
 	}
 
 	// Find session in database
-	session, err := uc.sessionRepo.FindByRefreshToken(refreshToken)
+	session, err := uc.sessionRepo.FindByRefreshToken(ctx, refreshToken)
 	if err != nil {
 		return nil, ErrSessionNotFound
 	}
@@ -137,6 +138,6 @@ func (uc *UseCase) RefreshToken(refreshToken string) (*jwt.TokenPair, error) {
 }
 
 // findAccountByEmail finds an account by email address
-func (uc *UseCase) findAccountByEmail(email string) (accountDomain.Account, error) {
-	return uc.accountRepo.FindByEmail(accountDomain.Email(email))
+func (uc *UseCase) findAccountByEmail(ctx context.Context, email string) (accountDomain.Account, error) {
+	return uc.accountRepo.FindByEmail(ctx, accountDomain.Email(email))
 }

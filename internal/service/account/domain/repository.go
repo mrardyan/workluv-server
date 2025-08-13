@@ -1,17 +1,21 @@
 package domain
 
-import "github.com/google/uuid"
+import (
+	"context"
+
+	"github.com/google/uuid"
+)
 
 type Repository interface {
-	Create(account Account) (Account, error)
-	Delete(accountID uuid.UUID) error
-	FindByEmail(email Email) (Account, error)
-	FindByID(id uuid.UUID) (Account, error)
-	Update(account Account) (Account, error)
+	Create(ctx context.Context, account Account) (Account, error)
+	Delete(ctx context.Context, accountID uuid.UUID) error
+	FindByEmail(ctx context.Context, email Email) (Account, error)
+	FindByID(ctx context.Context, id uuid.UUID) (Account, error)
+	Update(ctx context.Context, account Account) (Account, error)
 
 	// Verification
-	CreateVerification(verification Verification) (Verification, error)
-	FindByToken(token string) (Verification, error)
-	UpdateVerification(verification Verification) (Verification, error)
-	FindByAccountID(accountID uuid.UUID) (Verification, error)
+	CreateVerification(ctx context.Context, verification Verification) (Verification, error)
+	FindByToken(ctx context.Context, token string) (Verification, error)
+	UpdateVerification(ctx context.Context, verification Verification) (Verification, error)
+	FindByAccountID(ctx context.Context, accountID uuid.UUID) (Verification, error)
 }
