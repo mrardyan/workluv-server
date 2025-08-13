@@ -1,8 +1,11 @@
 package delivery
 
 import (
+	"go-server/internal/infrastructure"
 	"go-server/internal/service/account/domain"
+	"go-server/internal/service/account/dto"
 	"go-server/internal/service/account/repository"
+	"go-server/pkg/config"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -16,9 +19,9 @@ type Controller struct {
 	HTTPClient *http.Client
 }
 
-func NewAccountController(db *gorm.DB, httpClient *http.Client) *Controller {
+func NewAccountController(db *gorm.DB, httpClient *http.Client, emailService infrastructure.EmailService, cfg *config.Config) *Controller {
 	repo := repository.NewGormRepository(db)
-	useCase := domain.NewUseCase(repo)
+	useCase := domain.NewUseCase(repo, emailService, cfg)
 	return &Controller{
 		UseCase:    useCase,
 		HTTPClient: httpClient,
@@ -26,14 +29,10 @@ func NewAccountController(db *gorm.DB, httpClient *http.Client) *Controller {
 }
 
 func (ctl *Controller) CreateAccount(c *gin.Context) {
-	var req struct {
-		FullName string `json:"full_name" binding:"required"`
-		Email    string `json:"email" binding:"required"`
-		Password string `json:"password" binding:"required"`
-	}
+	var req dto.CreateAccountRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: " + err.Error()})
 		return
 	}
 
@@ -66,13 +65,83 @@ func (ctl *Controller) CreateAccount(c *gin.Context) {
 		EmailVerified: false,
 	}
 
-	createdAccount, err := ctl.UseCase.CreateAccount(account)
+	createdAccount, err := ctl.UseCase.CreateAccount(c.Request.Context(), account)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, createdAccount)
+	response := dto.CreateAccountResponse{
+		ID:            createdAccount.ID.String(),
+		Email:         string(createdAccount.Email),
+		FullName:      createdAccount.FullName,
+		IsActive:      createdAccount.IsActive,
+		EmailVerified: createdAccount.EmailVerified,
+		CreatedAt:     createdAccount.CreatedAt,
+		Message:       "Account created successfully. Please check your email to verify your account.",
+	}
+
+	c.JSON(http.StatusCreated, response)
+}
+
+func (ctl *Controller) VerifyEmail(c *gin.Context) {
+	token := c.Query("token")
+	if token == "" {
+		// Try to get token from request body
+		var req dto.VerifyEmailRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Verification token is required"})
+			return
+		}
+		token = req.Token
+	}
+
+	err := ctl.UseCase.VerifyEmail(c.Request.Context(), token)
+	if err != nil {
+		response := dto.EmailVerificationResponse{
+			Success: false,
+			Message: err.Error(),
+		}
+		c.JSON(http.StatusBadRequest, response)
+		return
+	}
+
+	response := dto.EmailVerificationResponse{
+		Success: true,
+		Message: "Email verified successfully! You can now log in.",
+	}
+	c.JSON(http.StatusOK, response)
+}
+
+func (ctl *Controller) ResendVerificationEmail(c *gin.Context) {
+	var req dto.ResendVerificationRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	email := domain.Email(req.Email)
+	if !email.IsValid() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email format"})
+		return
+	}
+
+	err := ctl.UseCase.ResendVerificationEmail(c.Request.Context(), email)
+	if err != nil {
+		response := dto.EmailVerificationResponse{
+			Success: false,
+			Message: err.Error(),
+		}
+		c.JSON(http.StatusBadRequest, response)
+		return
+	}
+
+	response := dto.EmailVerificationResponse{
+		Success: true,
+		Message: "Verification email sent successfully. Please check your email.",
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 func (ctl *Controller) DeleteAccount(c *gin.Context) {

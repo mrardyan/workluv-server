@@ -34,18 +34,25 @@ func main() {
 	// Step 3: Initialize a default HTTP client for making requests to external services.
 	httpClient := infrastructure.NewDefaultHTTPClient()
 
-	// Step 4: Set up the Gin HTTP router, which will handle all incoming HTTP requests.
+	// Step 4: Initialize email service
+	emailService, err := infrastructure.NewEmailService(cfg)
+	if err != nil {
+		log.Fatalf("Failed to initialize email service: %v", err)
+	}
+	log.Printf("Email service initialized: enabled=%t", emailService.IsEnabled())
+
+	// Step 5: Set up the Gin HTTP router, which will handle all incoming HTTP requests.
 	router := infrastructure.SetupRouter(cfg)
 
-	// Step 5: Register all application services and their respective routes with the router.
+	// Step 6: Register all application services and their respective routes with the router.
 	// This includes the account service, session service, and workspace service, both of which may depend on
-	// the database connection and the HTTP client for their operations.
+	// the database connection, email service, and the HTTP client for their operations.
 	internal.RegisterHealthRoutes(router, db, redisClient)
-	account.RegisterAccountService(router, db, httpClient)
+	account.RegisterAccountService(router, db, httpClient, emailService, cfg)
 	session.RegisterSessionService(router, db, cfg)
 	workspace.RegisterWorkspaceService(router, db, httpClient)
 
-	// Step 6: Start the HTTP server on the configured port and listen for incoming requests.
+	// Step 7: Start the HTTP server on the configured port and listen for incoming requests.
 	// If the server fails to start, log the error and terminate the application.
 	serverAddr := ":" + cfg.Server.Port
 	log.Printf("Server is starting on port %s", serverAddr)

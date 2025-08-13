@@ -34,3 +34,53 @@ func (d *Database) FindByEmail(email accountdomain.Email) (accountdomain.Account
 	}
 	return account, nil
 }
+
+func (d *Database) FindByID(id uuid.UUID) (accountdomain.Account, error) {
+	var account accountdomain.Account
+	err := d.DB.Where("id = ?", id).First(&account).Error
+	if err != nil {
+		return accountdomain.Account{}, err
+	}
+	return account, nil
+}
+
+func (d *Database) Update(account accountdomain.Account) (accountdomain.Account, error) {
+	if err := d.DB.Save(&account).Error; err != nil {
+		return accountdomain.Account{}, err
+	}
+	return account, nil
+}
+
+// VerificationRepository methods
+
+func (d *Database) CreateVerification(verification accountdomain.Verification) (accountdomain.Verification, error) {
+	if err := d.DB.Create(&verification).Error; err != nil {
+		return accountdomain.Verification{}, err
+	}
+	return verification, nil
+}
+
+func (d *Database) FindByToken(token string) (accountdomain.Verification, error) {
+	var verification accountdomain.Verification
+	err := d.DB.Where("token = ?", token).First(&verification).Error
+	if err != nil {
+		return accountdomain.Verification{}, err
+	}
+	return verification, nil
+}
+
+func (d *Database) UpdateVerification(verification accountdomain.Verification) (accountdomain.Verification, error) {
+	if err := d.DB.Save(&verification).Error; err != nil {
+		return accountdomain.Verification{}, err
+	}
+	return verification, nil
+}
+
+func (d *Database) FindByAccountID(accountID uuid.UUID) (accountdomain.Verification, error) {
+	var verification accountdomain.Verification
+	err := d.DB.Where("account_id = ?", accountID).First(&verification).Error
+	if err != nil {
+		return accountdomain.Verification{}, err
+	}
+	return verification, nil
+}

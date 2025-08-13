@@ -5,9 +5,11 @@ import (
 )
 
 const (
-	servicePath       = "/accounts"
-	createAccountPath = "/"
-	deleteAccountPath = "/:id"
+	servicePath            = "/accounts"
+	createAccountPath      = "/"
+	verifyEmailPath        = "/verify-email"
+	resendVerificationPath = "/resend-verification"
+	deleteAccountPath      = "/:id"
 )
 
 type Router struct {
@@ -21,6 +23,15 @@ func NewAccountRouter(router *gin.Engine) *Router {
 
 func (r *Router) CreateAccount(handler gin.HandlerFunc) {
 	r.routerGroup.POST(createAccountPath, handler)
+}
+
+func (r *Router) VerifyEmail(handler gin.HandlerFunc) {
+	r.routerGroup.GET(verifyEmailPath, handler)
+	r.routerGroup.POST(verifyEmailPath, handler)
+}
+
+func (r *Router) ResendVerificationEmail(handler gin.HandlerFunc) {
+	r.routerGroup.POST(resendVerificationPath, handler)
 }
 
 func (r *Router) DeleteAccount(handler gin.HandlerFunc) {
