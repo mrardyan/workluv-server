@@ -1,12 +1,12 @@
 package infrastructure
 
 import (
+	"database/sql"
 	"go-server/pkg/config"
 
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-func ConnectDB(cfg *config.Config) (*gorm.DB, error) {
-	return gorm.Open(postgres.Open(cfg.Database.URL), &gorm.Config{})
+func ConnectDB(cfg *config.Config) (*sql.DB, error) {
+	return sql.Open("pgx", cfg.Database.URL)
 }

@@ -51,12 +51,20 @@ func TestRouterConnections(t *testing.T) {
 	// Initialize HTTP client
 	httpClient := infrastructure.NewDefaultHTTPClient()
 
+	// Initialize email service for testing
+	emailService, err := infrastructure.NewEmailService(cfg)
+	if err != nil {
+		t.Logf("Email service initialization failed (continuing with tests): %v", err)
+		// Use disabled email service for testing
+		emailService = &infrastructure.DisabledEmailService{}
+	}
+
 	// Setup router
 	router := infrastructure.SetupRouter(cfg)
 
 	// Register all routes
 	internal.RegisterHealthRoutes(router, db, redisClient)
-	account.RegisterAccountService(router, db, httpClient)
+	account.RegisterAccountService(router, db, httpClient, emailService, cfg)
 	workspace.RegisterWorkspaceService(router, db, httpClient)
 
 	// Create test server
