@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # =============================================================================
 # GO-SERVER - DATABASE MIGRATION SCRIPT
@@ -107,19 +107,19 @@ validate_migration_name() {
     
     # Check for common action verbs
     local first_word=$(echo "$name" | cut -d'_' -f1)
-    local valid_verbs=("add" "create" "remove" "drop" "update" "alter" "fix" "migrate" "seed")
+    local valid_verbs="add create remove drop update alter fix migrate seed"
     local is_valid=false
     
-    for verb in "${valid_verbs[@]}"; do
-        if [[ "$first_word" == "$verb" ]]; then
+    for verb in $valid_verbs; do
+        if [ "$first_word" = "$verb" ]; then
             is_valid=true
             break
         fi
     done
     
-    if [[ "$is_valid" == false ]]; then
+    if [ "$is_valid" = false ]; then
         print_warning "Migration name should start with an action verb"
-        print_warning "Recommended verbs: ${valid_verbs[*]}"
+        print_warning "Recommended verbs: $valid_verbs"
     fi
     
     return 0
@@ -133,7 +133,7 @@ validate_migration_file() {
     print_status "Validating migration file: $(basename "$file_path")"
     
     # Check if file exists
-    if [[ ! -f "$file_path" ]]; then
+    if [ ! -f "$file_path" ]; then
         print_error "Migration file not found: $file_path"
         return 1
     fi
@@ -178,12 +178,12 @@ validate_migration_file() {
     
     # Check DOWN migration has actual rollback code
     local down_section=$(sed -n '/-- +goose Down/,$p' "$file_path")
-    if [[ $(echo "$down_section" | grep -c "^[[:space:]]*[A-Z]") -eq 0 ]]; then
+    if [ $(echo "$down_section" | grep -c "^[[:space:]]*[A-Z]") -eq 0 ]; then
         print_error "DOWN migration appears to be empty - rollback procedures are required"
         errors=$((errors + 1))
     fi
     
-    if [[ $errors -eq 0 ]]; then
+    if [ $errors -eq 0 ]; then
         print_success "Migration validation passed"
         return 0
     else
@@ -370,11 +370,11 @@ run_migration() {
     local migration_dir="migration"
     
     # Commands that don't need database connection
-    local no_db_commands=("lint" "check-deps" "create" "create-go" "validate")
+    local no_db_commands="lint check-deps create create-go validate"
     local needs_db=true
     
-    for no_db_cmd in "${no_db_commands[@]}"; do
-        if [[ "$command" == "$no_db_cmd" ]]; then
+    for no_db_cmd in $no_db_commands; do
+        if [ "$command" = "$no_db_cmd" ]; then
             needs_db=false
             break
         fi
@@ -437,25 +437,26 @@ run_migration() {
             if [ -n "$migration_name" ]; then
                 # Validate specific migration file
                 local file_pattern="$migration_dir/*$migration_name*.sql"
-                local matching_files=($(ls $file_pattern 2>/dev/null))
-                if [[ ${#matching_files[@]} -eq 0 ]]; then
+                local matching_files=$(ls $file_pattern 2>/dev/null)
+                local file_count=$(echo "$matching_files" | wc -w)
+                if [ "$file_count" -eq 0 ]; then
                     print_error "No migration file found matching: $migration_name"
                     exit 1
-                elif [[ ${#matching_files[@]} -gt 1 ]]; then
+                elif [ "$file_count" -gt 1 ]; then
                     print_error "Multiple migration files found matching: $migration_name"
-                    for file in "${matching_files[@]}"; do
+                    for file in $matching_files; do
                         echo "  - $(basename "$file")"
                     done
                     exit 1
                 else
-                    validate_migration_file "${matching_files[0]}"
+                    validate_migration_file "$matching_files"
                 fi
             else
                 # Validate all migration files
                 print_header "Validating All Migrations"
-                local migration_files=($(ls "$migration_dir"/*.sql 2>/dev/null | sort))
+                local migration_files=$(ls "$migration_dir"/*.sql 2>/dev/null | sort)
                 local total_errors=0
-                for file in "${migration_files[@]}"; do
+                for file in $migration_files; do
                     if ! validate_migration_file "$file"; then
                         total_errors=$((total_errors + 1))
                     fi
@@ -474,15 +475,16 @@ run_migration() {
                 exit 1
             fi
             local file_pattern="$migration_dir/*$migration_name*.sql"
-            local matching_files=($(ls $file_pattern 2>/dev/null))
-            if [[ ${#matching_files[@]} -eq 0 ]]; then
+            local matching_files=$(ls $file_pattern 2>/dev/null)
+            local file_count=$(echo "$matching_files" | wc -w)
+            if [ "$file_count" -eq 0 ]; then
                 print_error "No migration file found matching: $migration_name"
                 exit 1
-            elif [[ ${#matching_files[@]} -gt 1 ]]; then
+            elif [ "$file_count" -gt 1 ]; then
                 print_error "Multiple migration files found matching: $migration_name"
                 exit 1
             else
-                test_migration "$environment" "${matching_files[0]}"
+                test_migration "$environment" "$matching_files"
             fi
             ;;
         "check-deps")
@@ -655,11 +657,11 @@ main() {
     check_migration_tool
     
     # Commands that don't require environment
-    local no_env_commands=("lint" "check-deps")
+    local no_env_commands="lint check-deps"
     local needs_env=true
     
-    for no_env_cmd in "${no_env_commands[@]}"; do
-        if [[ "$command" == "$no_env_cmd" ]]; then
+    for no_env_cmd in $no_env_commands; do
+        if [ "$command" = "$no_env_cmd" ]; then
             needs_env=false
             break
         fi
