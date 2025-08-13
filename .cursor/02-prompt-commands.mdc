@@ -1,4 +1,273 @@
+---
+description: This file contains commonly used commands and shortcuts for development tasks.
+alwaysApply: false
+---
+# Prompt Commands
 
+This file contains commonly used commands and shortcuts for development tasks.
+
+## Database Migrations
+
+### Create New Migration
+```bash
+# Create a new migration (REQUIRED - never create manually)
+./src/scripts/migrate.sh create add_user_roles dev
+./src/scripts/migrate.sh create create_audit_table dev
+./src/scripts/migrate.sh create update_workspace_permissions dev
+```
+
+### Apply Migrations
+```bash
+# Apply all pending migrations
+./src/scripts/migrate.sh up dev
+
+# Apply one migration at a time
+./src/scripts/migrate.sh up-by-one dev
+
+# Rollback last migration
+./src/scripts/migrate.sh down dev
+
+# Check migration status
+./src/scripts/migrate.sh status dev
+
+# View current version
+./src/scripts/migrate.sh version dev
+```
+
+### Validate Migrations
+```bash
+# Validate all migrations
+./src/scripts/migrate.sh validate
+
+# Validate specific migration
+./src/scripts/migrate.sh validate migration_name
+
+# Lint for common issues
+./src/scripts/migrate.sh lint
+
+# Check dependencies
+./src/scripts/migrate.sh check-deps
+```
+
+### Test Migrations
+```bash
+# Test specific migration (up and down)
+./src/scripts/migrate.sh test migration_name dev
+
+# Reset all migrations (development only)
+./src/scripts/migrate.sh reset dev
+```
+
+## Environment Setup
+
+### Setup Environment Files
+```bash
+# Setup development environment
+./src/scripts/setup.sh dev
+
+# Setup staging environment
+./src/scripts/setup.sh staging
+
+# Setup production environment
+./src/scripts/setup.sh prod
+
+# Setup all environments
+./src/scripts/setup.sh all
+```
+
+### Setup with GitHub Integration
+```bash
+# Setup development + GitHub config
+./src/scripts/setup.sh dev --github username repo-name
+
+# Setup all environments + GitHub config
+./src/scripts/setup.sh all --github username repo-name
+```
+
+## Deployment
+
+### DigitalOcean App Platform
+```bash
+# Deploy to development
+./src/scripts/deploy.sh dev deploy
+
+# Deploy to staging
+./src/scripts/deploy.sh staging deploy
+
+# Deploy to production
+./src/scripts/deploy.sh prod deploy
+
+# Create new app
+./src/scripts/deploy.sh dev create
+./src/scripts/deploy.sh staging create
+./src/scripts/deploy.sh prod create
+```
+
+### App Management
+```bash
+# Check app status
+./src/scripts/deploy.sh dev status
+./src/scripts/deploy.sh staging status
+./src/scripts/deploy.sh prod status
+
+# View app logs
+./src/scripts/deploy.sh dev logs
+./src/scripts/deploy.sh staging logs
+./src/scripts/deploy.sh prod logs
+
+# List all apps
+./src/scripts/deploy.sh list
+```
+
+### App Spec Generation
+```bash
+# Generate app spec from .env file
+./src/scripts/deploy.sh dev generate
+./src/scripts/deploy.sh staging generate
+./src/scripts/deploy.sh prod generate
+```
+
+## Development Workflow
+
+### Quick Start
+```bash
+# 1. Setup environment
+./src/scripts/setup.sh dev
+
+# 2. Edit environment file
+nano .env.development
+
+# 3. Run migrations
+./src/scripts/migrate.sh up dev
+
+# 4. Deploy to development
+./src/scripts/deploy.sh dev create
+```
+
+### Daily Development
+```bash
+# Check migration status
+./src/scripts/migrate.sh status dev
+
+# Apply new migrations
+./src/scripts/migrate.sh up dev
+
+# Deploy changes
+./src/scripts/deploy.sh dev deploy
+
+# Check deployment status
+./src/scripts/deploy.sh dev status
+```
+
+### Testing Changes
+```bash
+# Validate migrations before committing
+./src/scripts/migrate.sh validate
+
+# Test specific migration
+./src/scripts/migrate.sh test migration_name dev
+
+# Generate app spec to test config
+./src/scripts/deploy.sh dev generate
+```
+
+## Troubleshooting
+
+### Common Issues
+```bash
+# Check prerequisites
+./src/scripts/setup.sh dev
+
+# Validate configuration
+./src/scripts/deploy.sh dev generate
+
+# Check migration status
+./src/scripts/migrate.sh status dev
+
+# View deployment logs
+./src/scripts/deploy.sh dev logs
+```
+
+### Debug Mode
+```bash
+# Enable debug output
+export DEBUG=true
+
+# Run commands with debug info
+./src/scripts/setup.sh dev
+./src/scripts/deploy.sh dev deploy
+./src/scripts/migrate.sh up dev
+```
+
+## Help and Documentation
+
+### Show Help
+```bash
+# Show setup help
+./src/scripts/setup.sh help
+
+# Show deployment help
+./src/scripts/deploy.sh help
+
+# Show migration help
+./src/scripts/migrate.sh help
+```
+
+### Environment Setup Instructions
+```bash
+# Show environment setup steps
+./src/scripts/setup.sh setup
+```
+
+## Quick Reference
+
+### Most Common Commands
+```bash
+# Development workflow
+./src/scripts/setup.sh dev                    # Setup dev environment
+./src/scripts/migrate.sh up dev               # Apply migrations
+./src/scripts/deploy.sh dev deploy            # Deploy to dev
+
+# Migration management
+./src/scripts/migrate.sh create name dev      # Create migration
+./src/scripts/migrate.sh validate             # Validate migrations
+./src/scripts/migrate.sh test name dev        # Test migration
+
+# Deployment
+./src/scripts/deploy.sh dev status            # Check status
+./src/scripts/deploy.sh dev logs              # View logs
+./src/scripts/deploy.sh dev generate          # Generate spec
+```
+
+### Environment-Specific
+```bash
+# Development
+./src/scripts/setup.sh dev
+./src/scripts/migrate.sh up dev
+./src/scripts/deploy.sh dev deploy
+
+# Staging
+./src/scripts/setup.sh staging
+./src/scripts/migrate.sh up staging
+./src/scripts/deploy.sh staging deploy
+
+# Production
+./src/scripts/setup.sh prod
+./src/scripts/migrate.sh up prod
+./src/scripts/deploy.sh prod deploy
+```
+
+## Notes
+
+- **Always use scripts**: Never create migrations manually or use tools directly
+- **Test in dev first**: Always test changes in development before staging/production
+- **Validate before commit**: Run validation commands before committing migrations
+- **Check status**: Use status commands to verify current state
+- **Debug mode**: Enable DEBUG=true for troubleshooting
+- **Test before commit** when possible
+- **Provide clear feedback** on command execution
+- **Stop on errors** and report issues clearly
+- **Confirm destructive operations** before execution
 # Prompt Commands
 
 This file contains commonly used commands and shortcuts for development tasks.

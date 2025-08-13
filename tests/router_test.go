@@ -28,7 +28,10 @@ func TestRouterConnections(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	// Load test configuration
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Failed to load configuration: %v", err)
+	}
 
 	// Setup logger for testing
 	logger.SetupLogger(cfg)
@@ -339,7 +342,10 @@ func TestIndividualRouterComponents(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	t.Run("Router Setup", func(t *testing.T) {
-		cfg := config.Load()
+		cfg, err := config.Load()
+		if err != nil {
+			t.Fatalf("Failed to load configuration: %v", err)
+		}
 		router := infrastructure.SetupRouter(cfg)
 		if router == nil {
 			t.Fatal("Expected router to be non-nil")
@@ -348,7 +354,10 @@ func TestIndividualRouterComponents(t *testing.T) {
 	})
 
 	t.Run("Account Router Creation", func(t *testing.T) {
-		cfg := config.Load()
+		cfg, err := config.Load()
+		if err != nil {
+			t.Fatalf("Failed to load configuration: %v", err)
+		}
 		router := infrastructure.SetupRouter(cfg)
 		accountRouter := accountDelivery.NewAccountRouter(router)
 		if accountRouter == nil {
@@ -358,7 +367,10 @@ func TestIndividualRouterComponents(t *testing.T) {
 	})
 
 	t.Run("Workspace Router Creation", func(t *testing.T) {
-		cfg := config.Load()
+		cfg, err := config.Load()
+		if err != nil {
+			t.Fatalf("Failed to load configuration: %v", err)
+		}
 		router := infrastructure.SetupRouter(cfg)
 		workspaceRouter := workspaceDelivery.NewWorkspaceRouter(router)
 		if workspaceRouter == nil {
@@ -372,7 +384,10 @@ func TestIndividualRouterComponents(t *testing.T) {
 func TestRouterMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Failed to load configuration: %v", err)
+	}
 	router := infrastructure.SetupRouter(cfg)
 
 	// Test that router has default Gin middleware (Logger, Recovery)

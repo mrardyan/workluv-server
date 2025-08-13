@@ -8,5 +8,5 @@ import (
 )
 
 func ConnectDB(cfg *config.Config) (*sql.DB, error) {
-	return sql.Open("pgx", cfg.Database.URL)
+	return sql.Open("pgx", cfg.GetPostgreSQLDSN())
 }

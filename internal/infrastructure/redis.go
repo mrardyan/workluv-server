@@ -13,9 +13,9 @@ import (
 // ConnectRedis establishes a connection to Redis
 func ConnectRedis(cfg *config.Config) (*redis.Client, error) {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", cfg.Redis.Host, cfg.Redis.Port),
-		Password: cfg.Redis.Password,
-		DB:       cfg.Redis.DB,
+		Addr:     cfg.GetRedisAddr(),
+		Password: cfg.Database.Redis.Password,
+		DB:       cfg.Database.Redis.Database,
 	})
 
 	// Test the connection

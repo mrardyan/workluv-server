@@ -1,4 +1,411 @@
+---
+description: This document defines the rules and best practices for database migrations in the Go server project.
+alwaysApply: false
+---
+# Database Migration Rules
 
+## Overview
+
+This document defines the rules and best practices for database migrations in the Go server project. All migrations must follow these rules to ensure consistency, safety, and maintainability.
+
+## Migration Management
+
+### 1. Script Usage (MANDATORY)
+
+**ALWAYS use the migration script for all operations:**
+
+```bash
+# Validation commands
+./src/scripts/migrate.sh validate               # Validate all migrations
+./src/scripts/migrate.sh validate migration_name # Validate specific migration
+./src/scripts/migrate.sh lint                   # Lint for common issues
+./src/scripts/migrate.sh check-deps             # Check dependencies
+
+# Migration operations
+./src/scripts/migrate.sh create migration_name env  # Create new migration (REQUIRED METHOD)
+./src/scripts/migrate.sh test migration_name env    # Test up/down migrations
+./src/scripts/migrate.sh up env                     # Apply all pending
+./src/scripts/migrate.sh down env                   # Rollback last migration
+./src/scripts/migrate.sh status env                 # Show migration status
+```
+
+### 2. Naming Convention
+
+**Migration names must follow this pattern:**
+```bash
+# Format: action_table_name
+./src/scripts/migrate.sh create add_user_roles dev
+./src/scripts/migrate.sh create create_audit_table dev
+./src/scripts/migrate.sh create update_workspace_permissions dev
+```
+
+**Valid action verbs:**
+- `add` - Add columns, constraints, or indexes
+- `create` - Create new tables
+- `remove` - Remove columns, constraints, or indexes
+- `drop` - Drop tables or other objects
+- `update` - Modify existing structures
+- `alter` - Alter table structures
+- `fix` - Fix data or structural issues
+- `migrate` - Data migration operations
+- `seed` - Seed initial data
+
+## Migration File Structure
+
+### 1. Required Sections
+
+Every migration file must contain:
+
+```sql
+-- +goose Up
+-- +goose StatementBegin
+-- Your UP migration SQL here
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+-- Your DOWN migration SQL here
+-- +goose StatementEnd
+```
+
+### 2. Header Documentation
+
+Include comprehensive documentation at the top:
+
+```sql
+-- Migration: [MIGRATION_NAME]
+-- Description: [Clear description of what this migration does]
+-- Business Context: [Why this migration is needed]
+-- Dependencies: [Any prerequisite migrations or system changes]
+-- Performance Impact: [Expected impact on database performance]
+-- Rollback Notes: [Special considerations for rollback]
+-- Created: [Date and author]
+```
+
+## SQL Best Practices
+
+### 1. Safety First
+
+**ALWAYS use safety clauses:**
+
+```sql
+-- ✅ CORRECT - Safe operations
+CREATE TABLE IF NOT EXISTS users (...);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20);
+DROP TABLE IF EXISTS temp_table CASCADE;
+DROP INDEX IF EXISTS idx_users_email;
+
+-- ❌ INCORRECT - Unsafe operations
+CREATE TABLE users (...);
+ALTER TABLE users ADD COLUMN phone VARCHAR(20);
+DROP TABLE temp_table;
+DROP INDEX idx_users_email;
+```
+
+### 2. Foreign Key Constraints
+
+**Always include proper foreign key constraints:**
+
+```sql
+-- ✅ CORRECT - With proper constraints
+CREATE TABLE posts (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    content TEXT,
+    created_at BIGINT NOT NULL DEFAULT EXTRACT(epoch FROM NOW())
+);
+
+-- ❌ INCORRECT - Missing constraints
+CREATE TABLE posts (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,  -- Missing REFERENCES
+    title VARCHAR(255) NOT NULL
+);
+```
+
+### 3. Indexes
+
+**Create indexes for performance:**
+
+```sql
+-- Indexes for foreign keys
+CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);
+
+-- Indexes for frequently queried columns
+CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at);
+CREATE INDEX IF NOT EXISTS idx_posts_title ON posts(title);
+
+-- Composite indexes for common query patterns
+CREATE INDEX IF NOT EXISTS idx_posts_user_created ON posts(user_id, created_at);
+```
+
+### 4. Epoch Time Fields
+
+**Use BIGINT for all date/time fields:**
+
+```sql
+-- ✅ CORRECT - Epoch seconds
+created_at BIGINT NOT NULL DEFAULT EXTRACT(epoch FROM NOW()),
+updated_at BIGINT NOT NULL DEFAULT EXTRACT(epoch FROM NOW()),
+expires_at BIGINT NOT NULL,
+completed_at BIGINT NULL
+
+-- ❌ INCORRECT - Timestamps
+created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+```
+
+## Rollback Procedures
+
+### 1. Complete Rollback
+
+**DOWN migration must completely reverse UP migration:**
+
+```sql
+-- +goose Down
+-- +goose StatementBegin
+-- Remove in reverse order of creation
+DROP INDEX IF EXISTS idx_posts_user_created;
+DROP INDEX IF EXISTS idx_posts_title;
+DROP INDEX IF EXISTS idx_posts_created_at;
+DROP INDEX IF EXISTS idx_posts_user_id;
+DROP TABLE IF EXISTS posts CASCADE;
+-- +goose StatementEnd
+```
+
+### 2. Data Preservation
+
+**Consider data during rollback:**
+
+```sql
+-- If dropping columns with data, warn about data loss
+-- +goose Down
+-- +goose StatementBegin
+-- WARNING: This will permanently delete user phone numbers
+ALTER TABLE users DROP COLUMN IF EXISTS phone;
+-- +goose StatementEnd
+```
+
+## Validation Requirements
+
+### 1. Pre-Commit Validation
+
+**Before committing any migration:**
+
+1. **Create using script ONLY**: Use `./src/scripts/migrate.sh create migration_name env` (never manual creation)
+2. **Follow naming convention**: Use descriptive, snake_case names
+3. **Include documentation**: Add comprehensive header comments
+4. **Run validation**: `./src/scripts/migrate.sh validate` before committing
+5. **Run linting**: `./src/scripts/migrate.sh lint` to catch issues
+6. **Test thoroughly**: `./src/scripts/migrate.sh test migration_name dev` to verify up/down migrations
+
+### 2. Validation Commands
+
+```bash
+# Validate all migrations
+./src/scripts/migrate.sh validate
+
+# Validate specific migration
+./src/scripts/migrate.sh validate migration_name
+
+# Lint for common issues
+./src/scripts/migrate.sh lint
+
+# Check dependencies
+./src/scripts/migrate.sh check-deps
+```
+
+## Common Patterns
+
+### 1. Adding Tables
+
+```sql
+-- +goose Up
+-- +goose StatementBegin
+CREATE TABLE IF NOT EXISTS user_profiles (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    bio TEXT,
+    avatar_url VARCHAR(500),
+    created_at BIGINT NOT NULL DEFAULT EXTRACT(epoch FROM NOW()),
+    updated_at BIGINT NOT NULL DEFAULT EXTRACT(epoch FROM NOW())
+);
+
+-- Add indexes for performance
+CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id ON user_profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_profiles_created_at ON user_profiles(created_at);
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+DROP TABLE IF EXISTS user_profiles CASCADE;
+-- +goose StatementEnd
+```
+
+### 2. Adding Columns
+
+```sql
+-- +goose Up
+-- +goose StatementBegin
+ALTER TABLE users 
+ADD COLUMN IF NOT EXISTS phone VARCHAR(20),
+ADD COLUMN IF NOT EXISTS verified_at BIGINT;
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+ALTER TABLE users 
+DROP COLUMN IF EXISTS phone,
+DROP COLUMN IF EXISTS verified_at;
+-- +goose StatementEnd
+```
+
+### 3. Adding Constraints
+
+```sql
+-- +goose Up
+-- +goose StatementBegin
+-- Add unique constraint
+ALTER TABLE users 
+ADD CONSTRAINT IF NOT EXISTS uk_users_email UNIQUE (email);
+
+-- Add check constraint
+ALTER TABLE users 
+ADD CONSTRAINT IF NOT EXISTS chk_users_age 
+CHECK (age >= 13 AND age <= 120);
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+-- Remove constraints
+ALTER TABLE users DROP CONSTRAINT IF EXISTS uk_users_email;
+ALTER TABLE users DROP CONSTRAINT IF EXISTS chk_users_age;
+-- +goose StatementEnd
+```
+
+## Anti-Patterns to Avoid
+
+### 1. Manual File Creation
+
+**❌ NEVER do this:**
+- Creating migration files manually
+- Copying existing migrations
+- Renaming migration files
+- Editing migration timestamps
+
+### 2. Unsafe Operations
+
+**❌ NEVER do this:**
+- DROP operations without IF EXISTS
+- CREATE operations without IF NOT EXISTS
+- Missing foreign key constraints
+- Missing indexes on foreign keys
+
+### 3. Incomplete Rollbacks
+
+**❌ NEVER do this:**
+- Empty DOWN migrations
+- Missing rollback procedures
+- Incomplete constraint removal
+- Data loss during rollback
+
+## Environment-Specific Rules
+
+### 1. Development
+
+- Test all migrations thoroughly
+- Use local database for testing
+- Validate before committing
+- Test rollbacks completely
+
+### 2. Staging
+
+- Apply migrations before production
+- Verify application functionality
+- Test rollback procedures
+- Monitor performance impact
+
+### 3. Production
+
+- Always backup before applying
+- Apply during maintenance windows
+- Monitor application health
+- Have rollback plan ready
+
+## Troubleshooting
+
+### 1. Migration Fails
+
+**Check:**
+- SQL syntax errors
+- Missing dependencies
+- Database connection
+- Environment variables
+
+**Debug:**
+```bash
+# Check migration status
+./src/scripts/migrate.sh status dev
+
+# View database logs
+docker-compose logs postgres
+```
+
+### 2. Rollback Issues
+
+**Common causes:**
+- Missing `IF EXISTS` clauses
+- Data dependencies
+- Constraint violations
+
+**Solution:**
+- Always use `IF EXISTS` for drops
+- Test rollbacks in development
+- Handle data migration carefully
+
+## Enforcement
+
+### 1. Automated Validation
+
+The migration system automatically validates:
+- Required sections (UP/DOWN)
+- Safety clauses (IF EXISTS/IF NOT EXISTS)
+- Foreign key constraints
+- Index creation
+- Rollback completeness
+
+### 2. Manual Review
+
+Before committing:
+- Review migration content
+- Verify rollback procedures
+- Check performance impact
+- Ensure documentation completeness
+
+### 3. Team Standards
+
+All team members must:
+- Use scripts for all operations
+- Follow naming conventions
+- Include proper documentation
+- Test thoroughly before committing
+
+## Summary
+
+**Key Rules:**
+1. **Use script ONLY**: NEVER create migrations manually - always use `./src/scripts/migrate.sh create`
+2. **Follow naming**: Use descriptive, snake_case names with action verbs
+3. **Safety first**: Always use IF EXISTS/IF NOT EXISTS clauses
+4. **Complete rollbacks**: DOWN migration must reverse UP migration completely
+5. **Test thoroughly**: Validate, lint, and test before committing
+6. **Document everything**: Include comprehensive header documentation
+
+**Remember:** Migrations are permanent changes to your database. Follow these rules to ensure safety, consistency, and maintainability.
+- **Rollback first**: Always design the Down migration before implementing Up
+- **Test thoroughly**: Every migration must be tested in development first
+- **Document clearly**: Include business context and dependencies
+- **Safety first**: When in doubt, ask for review before production deployment
 # Database Migration Rules
 
 ## Overview

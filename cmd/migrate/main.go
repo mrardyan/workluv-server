@@ -36,13 +36,16 @@ func main() {
 	command := args[0]
 
 	// Load configuration
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
 
 	// Setup logger
 	logger.SetupLogger(cfg)
 
-	// Use the database URL from config
-	dbURL := cfg.Database.URL
+	// Use the database connection string from config
+	dbURL := cfg.GetPostgreSQLDSN()
 
 	// Open database connection
 	db, err := sql.Open("pgx", dbURL)

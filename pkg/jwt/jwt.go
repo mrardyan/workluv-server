@@ -40,7 +40,7 @@ func NewService(cfg *config.Config) *Service {
 
 // GenerateAccessToken creates a new JWT access token
 func (s *Service) GenerateAccessToken(accountID uuid.UUID, email string) (string, shared.Time, error) {
-	expiryTime := time.Now().Add(s.config.JWT.AccessExpiry)
+	expiryTime := time.Now().Add(s.config.Security.JWTExpiration)
 	claims := Claims{
 		AccountID: accountID,
 		Email:     email,
@@ -53,7 +53,7 @@ func (s *Service) GenerateAccessToken(accountID uuid.UUID, email string) (string
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString([]byte(s.config.JWT.Secret))
+	tokenString, err := token.SignedString([]byte(s.config.Security.JWTSecret))
 	if err != nil {
 		return "", shared.Time{}, err
 	}
@@ -63,7 +63,7 @@ func (s *Service) GenerateAccessToken(accountID uuid.UUID, email string) (string
 
 // GenerateRefreshToken creates a new JWT refresh token
 func (s *Service) GenerateRefreshToken(accountID uuid.UUID, email string) (string, shared.Time, error) {
-	expiryTime := time.Now().Add(s.config.JWT.RefreshExpiry)
+	expiryTime := time.Now().Add(s.config.Security.SessionExpiration)
 	claims := Claims{
 		AccountID: accountID,
 		Email:     email,
@@ -76,7 +76,7 @@ func (s *Service) GenerateRefreshToken(accountID uuid.UUID, email string) (strin
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString([]byte(s.config.JWT.RefreshSecret))
+	tokenString, err := token.SignedString([]byte(s.config.Security.JWTSecret))
 	if err != nil {
 		return "", shared.Time{}, err
 	}
@@ -109,7 +109,7 @@ func (s *Service) ValidateAccessToken(tokenString string) (*Claims, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrTokenSignature
 		}
-		return []byte(s.config.JWT.Secret), nil
+		return []byte(s.config.Security.JWTSecret), nil
 	})
 
 	if err != nil {
@@ -136,7 +136,7 @@ func (s *Service) ValidateRefreshToken(tokenString string) (*Claims, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrTokenSignature
 		}
-		return []byte(s.config.JWT.RefreshSecret), nil
+		return []byte(s.config.Security.JWTSecret), nil
 	})
 
 	if err != nil {

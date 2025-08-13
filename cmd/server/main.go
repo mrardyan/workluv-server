@@ -43,7 +43,10 @@ func retryConnection(name string, maxRetries int, delay time.Duration, connectFu
 
 func main() {
 	// Load configuration from environment variables
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
 
 	// Setup logger based on configuration
 	logger.SetupLogger(cfg)
@@ -53,13 +56,13 @@ func main() {
 	// Step 1: Establish a connection to the database with retries
 	log.Println("Connecting to database...")
 	var db *sql.DB
-	err := retryConnection("database", 5, 5*time.Second, func() error {
+	dbErr := retryConnection("database", 5, 5*time.Second, func() error {
 		var dbErr error
 		db, dbErr = infrastructure.ConnectDB(cfg)
 		return dbErr
 	})
-	if err != nil {
-		log.Fatalf("Failed to connect to the database: %v", err)
+	if dbErr != nil {
+		log.Fatalf("Failed to connect to the database: %v", dbErr)
 	}
 	defer db.Close()
 	log.Println("Database connection established")
@@ -113,7 +116,7 @@ func main() {
 	workspace.RegisterWorkspaceService(router, db, httpClient)
 
 	// Step 7: Create HTTP server with graceful shutdown
-	serverAddr := ":" + cfg.Server.Port
+	serverAddr := cfg.Server.HTTPPort
 	server := &http.Server{
 		Addr:    serverAddr,
 		Handler: router,

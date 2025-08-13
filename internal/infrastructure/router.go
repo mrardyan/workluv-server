@@ -13,9 +13,9 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 
 	// Configure CORS middleware
 	corsConfig := cors.Config{
-		AllowOrigins:     cfg.CORS.AllowedOrigins,
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization"},
+		AllowOrigins:     cfg.Security.CORSAllowedOrigins,
+		AllowMethods:     cfg.Security.CORSAllowedMethods,
+		AllowHeaders:     cfg.Security.CORSAllowedHeaders,
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
