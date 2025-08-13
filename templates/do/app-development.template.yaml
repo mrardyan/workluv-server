@@ -11,7 +11,7 @@ services:
     instance_count: 1
     instance_size_slug: apps-s-1vcpu-0.5gb
     health_check:
-      http_path: /health
+      http_path: /health/simple
     envs:
       # Environment variables will be added here by the generator script
       # from .env.development file
@@ -26,9 +26,9 @@ databases:
     db_user: db
 
 domains:
-  - domain: api.dev.go-server.app
+  - domain: api.dev.workluv.app
     type: PRIMARY
-    zone: dev.go-server.app
+    zone: dev.workluv.app
 
 alerts:
   - rule: DEPLOYMENT_FAILED
