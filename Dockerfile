@@ -19,6 +19,9 @@ COPY . .
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/server
 
+# Build the migration tool
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o migrate ./cmd/migrate
+
 # Final stage
 FROM alpine:latest
 
@@ -35,6 +38,18 @@ WORKDIR /app
 # Copy binary from builder stage
 COPY --from=builder /app/main .
 
+# Copy migration tool
+COPY --from=builder /app/migrate .
+
+# Copy src folder (email templates and scripts)
+COPY --from=builder /app/src ./src
+
+# Copy migration folder (database migration files)
+COPY --from=builder /app/migration ./migration
+
+# Ensure directories exist and have proper permissions
+RUN mkdir -p ./src ./migration
+
 # Change ownership to non-root user
 RUN chown -R appuser:appgroup /app
 
@@ -46,7 +61,7 @@ EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health/simple || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health/simple || exit 1
 
 # Run the application directly
 CMD ["./main"]
