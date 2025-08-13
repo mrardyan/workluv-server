@@ -1,0 +1,28 @@
+workluv
+
+Hi {{.Username}},
+
+We detected a new login to your account.
+We want to make sure this was you.
+
+Device Information:
+{{.DeviceInfo}}
+
+If this was you, no action is needed. Your account is secure.
+
+If you don't recognize this activity:
+- Change your password immediately
+- Enable two-factor authentication if not already enabled
+- Review your recent account activity
+- Contact our support team
+
+We take your security seriously and will continue to monitor your account for any suspicious activity.
+
+Best,
+The Workluv Team
+
+---
+Need help? support@workluv.app
+
+© 2025 Workluv
+PT Marka Agregasi Maya. All Rights Reserved. 

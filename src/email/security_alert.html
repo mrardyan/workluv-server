@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en" style="margin: 0; padding: 0;">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark">
+    <meta name="supported-color-schemes" content="light dark">
+    <title>Security Alert</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 24px;
+            background-color: #F2F2F2;
+            color: #000000;
+            font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+                Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+        }
+
+        .container {
+            max-width: 480px;
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+            margin: 0 auto;
+            padding: 24px;
+            background-color: #ffffff;
+        }
+
+        .logo {
+            text-align: center;
+            display: flex;
+            justify-content: center;
+        }
+
+        .logo img {
+            max-width: 150px;
+            height: auto;
+        }
+
+        /* Default: show light mode image */
+        .logo img.light-mode {
+            display: block;
+        }
+
+        .logo img.dark-mode {
+            display: none;
+        }
+
+        .text-body {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* Gmail dark mode support using [data-ogsc] selector */
+        [data-ogsc] body {
+            background-color: #1a1a1a !important;
+            color: #ffffff !important;
+        }
+
+        [data-ogsc] .container {
+            background-color: #1a1a1a !important;
+        }
+
+        [data-ogsc] .logo img.light-mode {
+            display: none !important;
+        }
+
+        [data-ogsc] .logo img.dark-mode {
+            display: block !important;
+        }
+
+        [data-ogsc] .footer {
+            background-color: #1a1a1a !important;
+            color: #aaaaaa !important;
+        }
+
+        [data-ogsc] a {
+            color: #ff6fa7 !important;
+        }
+
+        [data-ogsc] .divider {
+            border-top-color: #ff6fa7 !important;
+        }
+
+        /* Media query for clients that support it (limited support) */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #1a1a1a;
+                color: #ffffff;
+            }
+
+            .container {
+                background-color: #1a1a1a;
+            }
+
+            .logo img.light-mode {
+                display: none;
+            }
+
+            .logo img.dark-mode {
+                display: block;
+            }
+
+            .footer {
+                background-color: #1a1a1a;
+                color: #aaaaaa;
+            }
+
+            a {
+                color: #ff6fa7;
+            }
+
+            .divider {
+                border-top-color: #ff6fa7;
+            }
+        }
+
+        /* JavaScript-controlled dark mode (fallback) */
+        body.dark-mode {
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+
+        .container.dark-mode {
+            background-color: #1a1a1a;
+        }
+
+        .dark-mode .logo img.light-mode {
+            display: none;
+        }
+
+        .dark-mode .logo img.dark-mode {
+            display: block;
+        }
+
+        .dark-mode .footer {
+            background-color: #1a1a1a;
+            color: #aaaaaa;
+        }
+
+        .dark-mode a {
+            color: #ff6fa7;
+        }
+
+        .dark-mode .divider {
+            border-top-color: #ff6fa7;
+        }
+
+        h1 {
+            font-size: 20px;
+        }
+
+        p {
+            font-size: 16px;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        strong {
+            font-weight: 600;
+        }
+
+        .button {
+            display: flex;
+            align-items: center;
+            margin: 0 auto;
+            justify-content: center;
+            background-color: #FA327F;
+            color: #fff !important;
+            text-decoration: none;
+            font-weight: 500;
+            height: 40px;
+            width: fit-content;
+            padding: 0 16px;
+            border-radius: 4px;
+        }
+
+        .need-help-email {
+            text-align: center;
+            font-size: 13px;
+            color: #666666;
+            line-height: 1.6;
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 13px;
+            color: #666666;
+            background-color: #F2F2F2;
+            line-height: 1.6;
+            padding: 24px 0;
+        }
+
+        .divider {
+            border-top: 1px solid #FA327F;
+        }
+
+        a {
+            color: #FA327F;
+            text-decoration: none;
+        }
+
+        .emoji {
+            font-size: 18px;
+            margin-right: 8px;
+        }
+
+        /* Email client specific fixes */
+        .button:hover {
+            color: #ffffff !important;
+            background-color: #ff1f75;
+        }
+
+        /* Outlook specific fixes */
+        .button {
+            mso-padding-alt: 12px 24px;
+        }
+
+        /* Force colors for clients that override them */
+        [data-ogsc] .button {
+            background-color: #FA327F !important;
+            color: #ffffff !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="logo">
+            <!-- Light mode logo (default) -->
+            <img class="light-mode"
+                src="https://ik.imagekit.io/eqpswigwb/fc5ae612-76d0-4f75-accc-42a2bbb5c8a5.png?updatedAt=1754135502856"
+                alt="Workluv logo" />
+
+            <!-- Dark mode logo -->
+            <img class="dark-mode"
+                src="https://ik.imagekit.io/eqpswigwb/296b1c0e-2fd7-4713-9ad8-da447d6313bf.png?updatedAt=1754135877959"
+                alt="Workluv logo" />
+        </div>
+
+        <div class="text-body">
+            <p>Hi <strong>{{.Username}}</strong>,</p>
+
+            <p>
+                We detected a new login to your account. <br />
+                We want to make sure this was you.
+            </p>
+
+            <p>
+                <strong>Device Information:</strong><br />
+                {{.DeviceInfo}}
+            </p>
+
+            <p>
+                If this was you, no action is needed. Your account is secure.
+            </p>
+
+            <p>
+                If you don't recognize this activity:
+            </p>
+
+            <ul style="font-size: 16px; line-height: 1.6; margin: 0 0 16px 0;">
+                <li>Change your password immediately</li>
+                <li>Enable two-factor authentication if not already enabled</li>
+                <li>Review your recent account activity</li>
+                <li>Contact our support team</li>
+            </ul>
+
+            <p>
+                We take your security seriously and will continue to monitor your account for any suspicious activity.
+            </p>
+
+            <p>Best, <br /><strong>The Workluv Team</strong></p>
+        </div>
+
+        <div class="divider"></div>
+
+        <span class="need-help-email">
+            Need help?
+            <a href="mailto:support@workluv.app">support@workluv.app</a>
+            <br /><br />
+        </span>
+    </div>
+    <div class="footer">
+        &copy; 2025 Workluv<br />
+        PT Marka Agregasi Maya. All Rights Reserved.
+    </div>
+
+    <!-- JavaScript fallback for clients that support it -->
+    <script>
+        (function () {
+            // Check if user prefers dark mode
+            function prefersDarkMode() {
+                return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            }
+
+            // Function to apply dark mode styles via JavaScript
+            function applyDarkMode() {
+                const body = document.body;
+                const container = document.querySelector('.container');
+
+                if (prefersDarkMode()) {
+                    body.classList.add('dark-mode');
+                    if (container) container.classList.add('dark-mode');
+                } else {
+                    body.classList.remove('dark-mode');
+                    if (container) container.classList.remove('dark-mode');
+                }
+            }
+
+            // Function to switch images based on theme
+            function switchImages() {
+                const lightImages = document.querySelectorAll('.light-mode');
+                const darkImages = document.querySelectorAll('.dark-mode');
+
+                if (prefersDarkMode()) {
+                    // Show dark mode images
+                    lightImages.forEach(img => img.style.display = 'none');
+                    darkImages.forEach(img => img.style.display = 'block');
+                } else {
+                    // Show light mode images
+                    lightImages.forEach(img => img.style.display = 'block');
+                    darkImages.forEach(img => img.style.display = 'none');
+                }
+            }
+
+            // Only run JavaScript if supported (many email clients don't support JS)
+            try {
+                // Initial application
+                applyDarkMode();
+                switchImages();
+
+                // Listen for theme changes
+                if (window.matchMedia) {
+                    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
+                        applyDarkMode();
+                        switchImages();
+                    });
+                }
+            } catch (e) {
+                // JavaScript not supported - rely on CSS only
+                console.log('JavaScript not supported in this email client');
+            }
+        })();
+    </script>
+</body>
+
+</html>
