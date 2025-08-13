@@ -1,6 +1,7 @@
 package delivery
 
 import (
+	"database/sql"
 	accountDomain "go-server/internal/service/account/domain"
 	accountRepo "go-server/internal/service/account/repository"
 	"go-server/internal/service/session/domain"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type Controller struct {
@@ -20,9 +20,9 @@ type Controller struct {
 }
 
 // NewSessionController creates a new session controller
-func NewSessionController(db *gorm.DB, cfg *config.Config) *Controller {
-	sessionRepo := repository.NewGormRepository(db)
-	accountRepoImpl := accountRepo.NewGormRepository(db)
+func NewSessionController(db *sql.DB, cfg *config.Config) *Controller {
+	sessionRepo := repository.NewRepository(db)
+	accountRepoImpl := accountRepo.NewRepository(db)
 	jwtService := jwt.NewService(cfg)
 	useCase := domain.NewUseCase(sessionRepo, accountRepoImpl, jwtService)
 
@@ -44,7 +44,7 @@ func (ctl *Controller) Login(c *gin.Context) {
 		Password: req.Password,
 	}
 
-	response, err := ctl.UseCase.Login(loginReq)
+	response, err := ctl.UseCase.Login(c.Request.Context(), loginReq)
 	if err != nil {
 		switch err {
 		case domain.ErrInvalidCredentials:
@@ -86,7 +86,7 @@ func (ctl *Controller) Logout(c *gin.Context) {
 		return
 	}
 
-	err := ctl.UseCase.Logout(req.RefreshToken)
+	err := ctl.UseCase.Logout(c.Request.Context(), req.RefreshToken)
 	if err != nil {
 		switch err {
 		case domain.ErrSessionNotFound:
@@ -116,7 +116,7 @@ func (ctl *Controller) LogoutAll(c *gin.Context) {
 		return
 	}
 
-	err = ctl.UseCase.LogoutAll(accountID)
+	err = ctl.UseCase.LogoutAll(c.Request.Context(), accountID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Logout all failed"})
 		return
@@ -133,7 +133,7 @@ func (ctl *Controller) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	tokenPair, err := ctl.UseCase.RefreshToken(req.RefreshToken)
+	tokenPair, err := ctl.UseCase.RefreshToken(c.Request.Context(), req.RefreshToken)
 	if err != nil {
 		switch err {
 		case jwt.ErrTokenExpired:

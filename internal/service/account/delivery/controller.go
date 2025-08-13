@@ -1,6 +1,7 @@
 package delivery
 
 import (
+	"database/sql"
 	"go-server/internal/infrastructure"
 	"go-server/internal/service/account/domain"
 	"go-server/internal/service/account/dto"
@@ -11,7 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 )
 
 type Controller struct {
@@ -19,8 +19,8 @@ type Controller struct {
 	HTTPClient *http.Client
 }
 
-func NewAccountController(db *gorm.DB, httpClient *http.Client, emailService infrastructure.EmailService, cfg *config.Config) *Controller {
-	repo := repository.NewGormRepository(db)
+func NewAccountController(db *sql.DB, httpClient *http.Client, emailService infrastructure.EmailService, cfg *config.Config) *Controller {
+	repo := repository.NewRepository(db)
 	useCase := domain.NewUseCase(repo, emailService, cfg)
 	return &Controller{
 		UseCase:    useCase,
@@ -152,7 +152,7 @@ func (ctl *Controller) DeleteAccount(c *gin.Context) {
 		return
 	}
 
-	err = ctl.UseCase.DeleteAccount(id)
+	err = ctl.UseCase.DeleteAccount(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -1,13 +1,13 @@
 package delivery
 
 import (
+	"database/sql"
 	"go-server/internal/service/workspace/domain"
 	"go-server/internal/service/workspace/repository"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 type Controller struct {
@@ -15,8 +15,8 @@ type Controller struct {
 	HTTPClient *http.Client
 }
 
-func NewWorkspaceController(db *gorm.DB, httpClient *http.Client) *Controller {
-	repo := repository.NewGormRepository(db)
+func NewWorkspaceController(db *sql.DB, httpClient *http.Client) *Controller {
+	repo := repository.NewRepository(db)
 	useCase := domain.NewUseCase(repo)
 	return &Controller{
 		UseCase:    useCase,
@@ -36,7 +36,7 @@ func (ctl *Controller) CreateWorkspace(c *gin.Context) {
 		return
 	}
 
-	workspace, err := ctl.UseCase.CreateWorkspace(domain.Workspace{
+	workspace, err := ctl.UseCase.CreateWorkspace(c.Request.Context(), domain.Workspace{
 		Name: req.Name,
 		Owner: domain.Owner{
 			ID:       req.OwnerID,
@@ -60,7 +60,7 @@ func (ctl *Controller) DeleteWorkspace(c *gin.Context) {
 		return
 	}
 
-	err = ctl.UseCase.DeleteWorkspace(uint(id))
+	err = ctl.UseCase.DeleteWorkspace(c.Request.Context(), uint(id))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -98,7 +98,7 @@ func (ctl *Controller) InviteMembers(c *gin.Context) {
 		}
 	}
 
-	err = ctl.UseCase.InviteMembers(uint(workspaceID), members)
+	err = ctl.UseCase.InviteMembers(c.Request.Context(), uint(workspaceID), members)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -134,7 +134,7 @@ func (ctl *Controller) RemoveMembers(c *gin.Context) {
 		}
 	}
 
-	err = ctl.UseCase.RemoveMembers(uint(workspaceID), members)
+	err = ctl.UseCase.RemoveMembers(c.Request.Context(), uint(workspaceID), members)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -165,7 +165,7 @@ func (ctl *Controller) ChangeAccess(c *gin.Context) {
 		return
 	}
 
-	err = ctl.UseCase.ChangeAccess(uint(workspaceID), uint(memberID), domain.Access(req.Access))
+	err = ctl.UseCase.ChangeAccess(c.Request.Context(), uint(workspaceID), uint(memberID), domain.Access(req.Access))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
