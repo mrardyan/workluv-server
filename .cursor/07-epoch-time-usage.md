@@ -1,0 +1,199 @@
+# Epoch Time Usage Rules
+
+## Overview
+This project uses a custom `Time` type that wraps epoch seconds for consistent time handling across all services. Always use the `shared.Time` type instead of raw `time.Time` or `int64` for time-related operations.
+
+## Core Principles
+
+### 1. Always Use shared.Time
+- **DO**: Use `shared.Time` for all time fields in entities, DTOs, and database operations
+- **DON'T**: Use raw `time.Time`, `int64`, or `string` for time values
+- **Reference**: `internal/shared/value.go`
+
+### 2. Time Creation Patterns
+```go
+// ✅ CORRECT - Use shared.Time constructors
+import "<your-project>/internal/shared"
+
+// Current time
+now := shared.Now()
+
+// From existing time.Time
+fromTime := shared.NewTime(time.Now())
+
+// From epoch seconds
+fromEpoch := shared.NewTimeFromEpoch(1640995200)
+
+// From epoch milliseconds
+fromEpochMilli := shared.NewTimeFromEpochMilli(1640995200000)
+```
+
+### 3. Database Operations
+```go
+// ✅ CORRECT - Store and retrieve as epoch
+func (r *Repository) CreateSession(session *Session) error {
+    query := `
+        INSERT INTO sessions (user_id, expires_at, created_at)
+        VALUES ($1, $2, $3)
+    `
+    _, err := r.db.Exec(query, 
+        session.UserID, 
+        session.ExpiresAt.ToEpoch(),      // Convert to epoch for storage
+        session.CreatedAt.ToEpoch(),
+    )
+    return err
+}
+
+func (r *Repository) GetSession(id string) (*Session, error) {
+    var session Session
+    var expiresAtEpoch, createdAtEpoch int64
+    
+    query := `SELECT user_id, expires_at, created_at FROM sessions WHERE id = $1`
+    err := r.db.QueryRow(query, id).Scan(
+        &session.UserID,
+        &expiresAtEpoch,                  // Scan into int64
+        &createdAtEpoch,
+    )
+    if err != nil {
+        return nil, err
+    }
+    
+    // Convert back to shared.Time
+    session.ExpiresAt = shared.NewTimeFromEpoch(expiresAtEpoch)
+    session.CreatedAt = shared.NewTimeFromEpoch(createdAtEpoch)
+    return &session, nil
+}
+```
+
+### 4. API Responses and DTOs
+```go
+// ✅ CORRECT - Use shared.Time in DTOs
+type SessionResponse struct {
+    ID        string      `json:"id"`
+    UserID    string      `json:"user_id"`
+    ExpiresAt shared.Time `json:"expires_at"`  // Not time.Time
+    CreatedAt shared.Time `json:"created_at"`
+}
+
+// ✅ CORRECT - Convert to epoch for JSON serialization
+func (s *Session) ToResponse() SessionResponse {
+    return SessionResponse{
+        ID:        s.ID,
+        UserID:    s.UserID,
+        ExpiresAt: s.ExpiresAt,           // shared.Time serializes as epoch
+        CreatedAt: s.CreatedAt,
+    }
+}
+```
+
+### 5. Time Comparisons and Calculations
+```go
+// ✅ CORRECT - Use shared.Time methods
+func (s *Session) IsExpired() bool {
+    return s.ExpiresAt.Before(shared.Now())
+}
+
+func (s *Session) TimeUntilExpiry() time.Duration {
+    return s.ExpiresAt.Sub(shared.Now())
+}
+
+func (s *Session) ExtendExpiry(duration time.Duration) {
+    s.ExpiresAt = s.ExpiresAt.Add(duration)
+}
+```
+
+### 6. Validation and Business Logic
+```go
+// ✅ CORRECT - Validate time constraints
+func (s *Session) Validate() error {
+    if s.ExpiresAt.IsZero() {
+        return errors.New("expires_at cannot be zero")
+    }
+    
+    if s.ExpiresAt.Before(shared.Now()) {
+        return errors.New("expires_at cannot be in the past")
+    }
+    
+    if s.CreatedAt.IsZero() {
+        return errors.New("created_at cannot be zero")
+    }
+    
+    return nil
+}
+```
+
+## Migration Guidelines
+
+### When Adding New Time Fields
+1. Always use `shared.Time` type in domain entities
+2. Update DTOs to use `shared.Time`
+3. Ensure database columns store epoch seconds (INTEGER/BIGINT)
+4. Use `.ToEpoch()` when storing to database
+5. Use `shared.NewTimeFromEpoch()` when reading from database
+
+### When Refactoring Existing Code
+1. Replace `time.Time` fields with `shared.Time`
+2. Update database queries to use `.ToEpoch()`
+3. Update JSON tags (they will automatically serialize as epoch)
+4. Test time comparisons and calculations
+
+## Common Patterns
+
+### Time Ranges
+```go
+// ✅ CORRECT - Time range queries
+func (r *Repository) GetSessionsInRange(start, end shared.Time) ([]Session, error) {
+    query := `
+        SELECT * FROM sessions 
+        WHERE created_at BETWEEN $1 AND $2
+    `
+    rows, err := r.db.Query(query, start.ToEpoch(), end.ToEpoch())
+    // ... handle results
+}
+```
+
+### Default Values
+```go
+// ✅ CORRECT - Set default times
+func NewSession(userID string) *Session {
+    return &Session{
+        ID:        uuid.New().String(),
+        UserID:    userID,
+        CreatedAt: shared.Now(),
+        ExpiresAt: shared.Now().Add(24 * time.Hour), // 24 hours from now
+    }
+}
+```
+
+## Testing
+```go
+// ✅ CORRECT - Test time operations
+func TestSession_IsExpired(t *testing.T) {
+    now := shared.Now()
+    past := now.Add(-1 * time.Hour)
+    future := now.Add(1 * time.Hour)
+    
+    session := &Session{
+        ExpiresAt: past,
+    }
+    
+    assert.True(t, session.IsExpired())
+    
+    session.ExpiresAt = future
+    assert.False(t, session.IsExpired())
+}
+```
+
+## Benefits of This Approach
+1. **Consistency**: All time handling follows the same pattern
+2. **Performance**: Epoch seconds are efficient for storage and comparison
+3. **Serialization**: JSON automatically handles epoch conversion
+4. **Type Safety**: Compile-time checking prevents time type mismatches
+5. **Maintainability**: Centralized time logic in shared package
+
+## Exceptions
+- **External APIs**: When interfacing with external services that require specific time formats
+- **Configuration**: When parsing configuration files that use different time formats
+- **Logging**: When using structured logging that expects time.Time
+
+In these cases, convert to/from `shared.Time` at the boundary of your application.
