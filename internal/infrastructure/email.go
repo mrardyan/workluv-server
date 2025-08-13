@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"fmt"
 	"html/template"
@@ -15,15 +16,15 @@ import (
 
 // EmailService represents the email service interface
 type EmailService interface {
-	SendEmail(to []string, subject, body string) error
-	SendTemplateEmail(to []string, subject, templateName string, data interface{}) error
-	SendHTMLEmail(to []string, subject, htmlBody, textBody string) error
+	SendEmail(ctx context.Context, to []string, subject, body string) error
+	SendTemplateEmail(ctx context.Context, to []string, subject, templateName string, data interface{}) error
+	SendHTMLEmail(ctx context.Context, to []string, subject, htmlBody, textBody string) error
 	IsEnabled() bool
 }
 
 // SMTPEmailService implements EmailService using SMTP
 type SMTPEmailService struct {
-	config *config.EmailConfig
+	config *config.Config
 	auth   smtp.Auth
 }
 
@@ -53,21 +54,21 @@ func NewEmailService(cfg *config.Config) (EmailService, error) {
 
 	switch strings.ToLower(cfg.Email.Provider) {
 	case "smtp":
-		return NewSMTPEmailService(&cfg.Email)
+		return NewSMTPEmailService(cfg)
 	default:
 		return nil, fmt.Errorf("unsupported email provider: %s", cfg.Email.Provider)
 	}
 }
 
 // NewSMTPEmailService creates a new SMTP email service
-func NewSMTPEmailService(cfg *config.EmailConfig) (*SMTPEmailService, error) {
-	if !cfg.Enabled {
+func NewSMTPEmailService(cfg *config.Config) (*SMTPEmailService, error) {
+	if !cfg.Email.Enabled {
 		return nil, fmt.Errorf("email service is disabled")
 	}
 
 	var auth smtp.Auth
-	if cfg.SMTPUsername != "" && cfg.SMTPPassword != "" {
-		auth = smtp.PlainAuth("", cfg.SMTPUsername, cfg.SMTPPassword, cfg.SMTPHost)
+	if cfg.Email.SMTPUsername != "" && cfg.Email.SMTPPassword != "" {
+		auth = smtp.PlainAuth("", cfg.Email.SMTPUsername, cfg.Email.SMTPPassword, cfg.Email.SMTPHost)
 	}
 
 	service := &SMTPEmailService{
@@ -76,39 +77,45 @@ func NewSMTPEmailService(cfg *config.EmailConfig) (*SMTPEmailService, error) {
 	}
 
 	log.Printf("SMTP email service initialized: host=%s, port=%d, tls=%t, ssl=%t",
-		cfg.SMTPHost, cfg.SMTPPort, cfg.UseTLS, cfg.UseSSL)
+		cfg.Email.SMTPHost, cfg.Email.SMTPPort, cfg.Email.UseTLS, cfg.Email.UseSSL)
 
 	return service, nil
 }
 
 // IsEnabled returns whether the email service is enabled
 func (s *SMTPEmailService) IsEnabled() bool {
-	return s.config.Enabled
+	return s.config.Email.Enabled
 }
 
 // SendEmail sends a plain text email
-func (s *SMTPEmailService) SendEmail(to []string, subject, body string) error {
-	return s.SendHTMLEmail(to, subject, "", body)
+func (s *SMTPEmailService) SendEmail(ctx context.Context, to []string, subject, body string) error {
+	return s.SendHTMLEmail(ctx, to, subject, "", body)
 }
 
 // SendHTMLEmail sends an email with both HTML and text content
-func (s *SMTPEmailService) SendHTMLEmail(to []string, subject, htmlBody, textBody string) error {
-	if !s.config.Enabled {
+func (s *SMTPEmailService) SendHTMLEmail(ctx context.Context, to []string, subject, htmlBody, textBody string) error {
+	if !s.config.Email.Enabled {
 		log.Printf("Email service is disabled, skipping email send for subject: %s", subject)
 		return nil
 	}
 
 	msg := s.buildEmailMessage(to, subject, htmlBody, textBody)
+	addr := fmt.Sprintf("%s:%d", s.config.Email.SMTPHost, s.config.Email.SMTPPort)
 
-	addr := fmt.Sprintf("%s:%d", s.config.SMTPHost, s.config.SMTPPort)
-
-	// Use standard SMTP with STARTTLS support (most compatible)
-	return smtp.SendMail(addr, s.auth, s.config.FromAddress, to, []byte(msg))
+	// Use improved connection method based on configuration
+	if s.config.Email.UseSSL {
+		return s.sendSMTPWithSSL(ctx, addr, to[0], msg)
+	} else if s.config.Email.UseTLS {
+		return s.sendSMTPWithTLS(ctx, addr, to[0], msg)
+	} else {
+		// Use standard SMTP (fallback)
+		return smtp.SendMail(addr, s.auth, s.config.Email.FromAddress, to, []byte(msg))
+	}
 }
 
 // SendTemplateEmail sends an email using a template
-func (s *SMTPEmailService) SendTemplateEmail(to []string, subject, templateName string, data interface{}) error {
-	if !s.config.Enabled {
+func (s *SMTPEmailService) SendTemplateEmail(ctx context.Context, to []string, subject, templateName string, data interface{}) error {
+	if !s.config.Email.Enabled {
 		log.Printf("Email service is disabled, skipping template email send for subject: %s, template: %s", subject, templateName)
 		return nil
 	}
@@ -118,72 +125,111 @@ func (s *SMTPEmailService) SendTemplateEmail(to []string, subject, templateName 
 		return fmt.Errorf("failed to render email template: %w", err)
 	}
 
-	return s.SendHTMLEmail(to, subject, htmlBody, textBody)
+	return s.SendHTMLEmail(ctx, to, subject, htmlBody, textBody)
 }
 
-// sendWithTLS sends email using TLS connection
-func (s *SMTPEmailService) sendWithTLS(addr, msg string) error {
-	host := strings.Split(addr, ":")[0]
-
+// sendSMTPWithSSL sends email using SSL connection
+func (s *SMTPEmailService) sendSMTPWithSSL(ctx context.Context, addr, to, message string) error {
 	// Create TLS config
 	tlsConfig := &tls.Config{
-		ServerName:         host,
-		InsecureSkipVerify: false, // Always verify certificates in production
+		ServerName: s.config.Email.SMTPHost,
 	}
 
-	// Connect to server
+	// Connect with SSL
 	conn, err := tls.Dial("tcp", addr, tlsConfig)
 	if err != nil {
-		return fmt.Errorf("failed to connect to SMTP server with TLS: %w", err)
+		return fmt.Errorf("failed to connect with SSL: %w", err)
 	}
 	defer conn.Close()
 
 	// Create SMTP client
-	client, err := smtp.NewClient(conn, host)
+	client, err := smtp.NewClient(conn, s.config.Email.SMTPHost)
 	if err != nil {
 		return fmt.Errorf("failed to create SMTP client: %w", err)
 	}
-	defer client.Quit()
+	defer client.Close()
 
-	// Authenticate if credentials are provided
+	// Authenticate
 	if s.auth != nil {
 		if err := client.Auth(s.auth); err != nil {
-			return fmt.Errorf("SMTP authentication failed: %w", err)
+			return fmt.Errorf("failed to authenticate: %w", err)
 		}
 	}
 
-	// Set sender
-	if err := client.Mail(s.config.FromAddress); err != nil {
+	// Send email
+	if err := client.Mail(s.config.Email.FromAddress); err != nil {
 		return fmt.Errorf("failed to set sender: %w", err)
 	}
 
-	// Set recipients
-	recipients := strings.Split(msg, "To: ")[1]
-	recipients = strings.Split(recipients, "\r\n")[0]
-	toAddresses := strings.Split(recipients, ", ")
-
-	for _, addr := range toAddresses {
-		addr = strings.TrimSpace(addr)
-		if addr != "" {
-			if err := client.Rcpt(addr); err != nil {
-				return fmt.Errorf("failed to set recipient %s: %w", addr, err)
-			}
-		}
+	if err := client.Rcpt(to); err != nil {
+		return fmt.Errorf("failed to set recipient: %w", err)
 	}
 
-	// Send message
 	writer, err := client.Data()
 	if err != nil {
 		return fmt.Errorf("failed to get data writer: %w", err)
 	}
-	defer writer.Close()
 
-	_, err = writer.Write([]byte(msg))
-	if err != nil {
+	if _, err := writer.Write([]byte(message)); err != nil {
 		return fmt.Errorf("failed to write message: %w", err)
 	}
 
-	log.Printf("Email sent successfully to %d recipients", len(toAddresses))
+	if err := writer.Close(); err != nil {
+		return fmt.Errorf("failed to close writer: %w", err)
+	}
+
+	log.Printf("Email sent successfully via SSL to: %s", to)
+	return nil
+}
+
+// sendSMTPWithTLS sends email using STARTTLS
+func (s *SMTPEmailService) sendSMTPWithTLS(ctx context.Context, addr, to, message string) error {
+	// Connect to SMTP server
+	client, err := smtp.Dial(addr)
+	if err != nil {
+		return fmt.Errorf("failed to connect to SMTP server: %w", err)
+	}
+	defer client.Close()
+
+	// Start TLS
+	tlsConfig := &tls.Config{
+		ServerName: s.config.Email.SMTPHost,
+	}
+
+	if err := client.StartTLS(tlsConfig); err != nil {
+		return fmt.Errorf("failed to start TLS: %w", err)
+	}
+
+	// Authenticate
+	if s.auth != nil {
+		if err := client.Auth(s.auth); err != nil {
+			return fmt.Errorf("failed to authenticate: %w", err)
+		}
+	}
+
+	// Send email
+	if err := client.Mail(s.config.Email.FromAddress); err != nil {
+		return fmt.Errorf("failed to set sender: %w", err)
+	}
+
+	if err := client.Rcpt(to); err != nil {
+		return fmt.Errorf("failed to set recipient: %w", err)
+	}
+
+	writer, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("failed to get data writer: %w", err)
+	}
+
+	if _, err := writer.Write([]byte(message)); err != nil {
+		return fmt.Errorf("failed to write message: %w", err)
+	}
+
+	if err := writer.Close(); err != nil {
+		return fmt.Errorf("failed to close writer: %w", err)
+	}
+
+	log.Printf("Email sent successfully via TLS to: %s", to)
 	return nil
 }
 
@@ -192,7 +238,7 @@ func (s *SMTPEmailService) buildEmailMessage(to []string, subject, htmlBody, tex
 	var msg bytes.Buffer
 
 	// Headers
-	msg.WriteString(fmt.Sprintf("From: %s <%s>\r\n", s.config.FromName, s.config.FromAddress))
+	msg.WriteString(fmt.Sprintf("From: %s <%s>\r\n", s.config.Email.FromName, s.config.Email.FromAddress))
 	msg.WriteString(fmt.Sprintf("To: %s\r\n", strings.Join(to, ", ")))
 	msg.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
 	msg.WriteString("MIME-Version: 1.0\r\n")
@@ -233,37 +279,54 @@ func (s *SMTPEmailService) buildEmailMessage(to []string, subject, htmlBody, tex
 	return msg.String()
 }
 
-// renderTemplate renders an email template
+// renderTemplate renders an email template with improved error handling
 func (s *SMTPEmailService) renderTemplate(templateName string, data interface{}) (htmlBody, textBody string, err error) {
-	if s.config.TemplateDir == "" {
+	if s.config.Email.TemplateDir == "" {
 		return "", "", fmt.Errorf("template directory not configured")
 	}
 
-	// Try to load HTML template
-	htmlPath := filepath.Join(s.config.TemplateDir, templateName+".html")
-	htmlTemplate, err := template.ParseFiles(htmlPath)
-	if err == nil {
+	var htmlErr, textErr error
+
+	// Try to load and render HTML template
+	htmlPath := filepath.Join(s.config.Email.TemplateDir, templateName+".html")
+	if htmlTemplate, err := template.ParseFiles(htmlPath); err == nil {
 		var htmlBuf bytes.Buffer
 		if err := htmlTemplate.Execute(&htmlBuf, data); err != nil {
-			return "", "", fmt.Errorf("failed to execute HTML template: %w", err)
+			htmlErr = fmt.Errorf("failed to execute HTML template %s: %w", htmlPath, err)
+		} else {
+			htmlBody = htmlBuf.String()
 		}
-		htmlBody = htmlBuf.String()
+	} else {
+		htmlErr = fmt.Errorf("failed to parse HTML template %s: %w", htmlPath, err)
 	}
 
-	// Try to load text template
-	textPath := filepath.Join(s.config.TemplateDir, templateName+".txt")
-	textTemplate, err := template.ParseFiles(textPath)
-	if err == nil {
+	// Try to load and render text template
+	textPath := filepath.Join(s.config.Email.TemplateDir, templateName+".txt")
+	if textTemplate, err := template.ParseFiles(textPath); err == nil {
 		var textBuf bytes.Buffer
 		if err := textTemplate.Execute(&textBuf, data); err != nil {
-			return "", "", fmt.Errorf("failed to execute text template: %w", err)
+			textErr = fmt.Errorf("failed to execute text template %s: %w", textPath, err)
+		} else {
+			textBody = textBuf.String()
 		}
-		textBody = textBuf.String()
+	} else {
+		textErr = fmt.Errorf("failed to parse text template %s: %w", textPath, err)
 	}
 
-	// If neither template exists, return an error
+	// If neither template loaded successfully, return detailed error
 	if htmlBody == "" && textBody == "" {
+		if htmlErr != nil && textErr != nil {
+			return "", "", fmt.Errorf("no templates found for %s - HTML error: %v, Text error: %v", templateName, htmlErr, textErr)
+		}
 		return "", "", fmt.Errorf("no templates found for %s (looked for %s.html and %s.txt)", templateName, templateName, templateName)
+	}
+
+	// Log any partial failures but continue
+	if htmlErr != nil {
+		log.Printf("Warning: HTML template failed for %s: %v", templateName, htmlErr)
+	}
+	if textErr != nil {
+		log.Printf("Warning: Text template failed for %s: %v", templateName, textErr)
 	}
 
 	return htmlBody, textBody, nil
@@ -272,17 +335,17 @@ func (s *SMTPEmailService) renderTemplate(templateName string, data interface{})
 // DisabledEmailService is a no-op implementation when email is disabled
 type DisabledEmailService struct{}
 
-func (d *DisabledEmailService) SendEmail(to []string, subject, body string) error {
+func (d *DisabledEmailService) SendEmail(ctx context.Context, to []string, subject, body string) error {
 	log.Printf("Email service disabled, would send email to: %v, subject: %s", to, subject)
 	return nil
 }
 
-func (d *DisabledEmailService) SendTemplateEmail(to []string, subject, templateName string, data interface{}) error {
+func (d *DisabledEmailService) SendTemplateEmail(ctx context.Context, to []string, subject, templateName string, data interface{}) error {
 	log.Printf("Email service disabled, would send template email to: %v, subject: %s, template: %s", to, subject, templateName)
 	return nil
 }
 
-func (d *DisabledEmailService) SendHTMLEmail(to []string, subject, htmlBody, textBody string) error {
+func (d *DisabledEmailService) SendHTMLEmail(ctx context.Context, to []string, subject, htmlBody, textBody string) error {
 	log.Printf("Email service disabled, would send HTML email to: %v, subject: %s", to, subject)
 	return nil
 }
@@ -294,45 +357,60 @@ func (d *DisabledEmailService) IsEnabled() bool {
 // Helper functions for common email operations
 
 // SendWelcomeEmail sends a welcome email to a new user (using verification_email template)
-func SendWelcomeEmail(emailService EmailService, to, username, verificationURL string) error {
+func SendWelcomeEmail(ctx context.Context, emailService EmailService, cfg *config.Config, to, username, token string) error {
+	// Create verification URL using client URL
+	verificationURL := fmt.Sprintf("%s/verify-email?token=%s", cfg.Server.ClientURL, token)
+
 	data := map[string]interface{}{
 		"Username":        username,
 		"VerificationURL": verificationURL,
+		"Token":           token,
 	}
-	return emailService.SendTemplateEmail([]string{to}, "Welcome to Workluv - Verify Your Email", "verification_email", data)
+	return emailService.SendTemplateEmail(ctx, []string{to}, "Welcome to Workluv - Verify Your Email", "verification_email", data)
 }
 
 // SendPasswordResetEmail sends a password reset email
-func SendPasswordResetEmail(emailService EmailService, to, username, resetURL string) error {
+func SendPasswordResetEmail(ctx context.Context, emailService EmailService, cfg *config.Config, to, username, token string) error {
+	// Create reset URL using server host
+	resetURL := fmt.Sprintf("%s/reset-password?token=%s", cfg.Server.Host, token)
+
 	data := map[string]interface{}{
 		"Username": username,
 		"ResetURL": resetURL,
+		"Token":    token,
 	}
-	return emailService.SendTemplateEmail([]string{to}, "Password Reset Request", "password_reset", data)
+	return emailService.SendTemplateEmail(ctx, []string{to}, "Reset Your Password", "password_reset", data)
 }
 
 // SendVerificationEmail sends an email verification email
-func SendVerificationEmail(emailService EmailService, to, username, verificationURL string) error {
+func SendVerificationEmail(ctx context.Context, emailService EmailService, cfg *config.Config, to, username, token string) error {
+	// Create verification URL using client URL
+	verificationURL := fmt.Sprintf("%s/verify-email?token=%s", cfg.Server.ClientURL, token)
+
 	data := map[string]interface{}{
 		"Username":        username,
 		"VerificationURL": verificationURL,
+		"Token":           token,
 	}
-	return emailService.SendTemplateEmail([]string{to}, "Please Verify Your Email", "verification_email", data)
+	return emailService.SendTemplateEmail(ctx, []string{to}, "Verify Your Email Address", "verification_email", data)
 }
 
 // SendSecurityAlertEmail sends a security alert email for suspicious activity
-func SendSecurityAlertEmail(emailService EmailService, to, username, deviceInfo string) error {
+func SendSecurityAlertEmail(ctx context.Context, emailService EmailService, to, username, alertType, deviceInfo string) error {
+	subject := fmt.Sprintf("Security Alert: %s", alertType)
+
 	data := map[string]interface{}{
 		"Username":   username,
+		"AlertType":  alertType,
 		"DeviceInfo": deviceInfo,
 	}
-	return emailService.SendTemplateEmail([]string{to}, "Security Alert - New Login Detected", "security_alert", data)
+	return emailService.SendTemplateEmail(ctx, []string{to}, subject, "security_alert", data)
 }
 
 // SendTwoFactorSetupEmail sends an email for two-factor authentication setup
-func SendTwoFactorSetupEmail(emailService EmailService, to, username string) error {
+func SendTwoFactorSetupEmail(ctx context.Context, emailService EmailService, to, username string) error {
 	data := map[string]interface{}{
 		"Username": username,
 	}
-	return emailService.SendTemplateEmail([]string{to}, "Two-Factor Authentication Setup", "two_factor_setup", data)
+	return emailService.SendTemplateEmail(ctx, []string{to}, "Two-Factor Authentication Setup", "two_factor_setup", data)
 }

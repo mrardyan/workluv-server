@@ -40,7 +40,9 @@ type RedisConfig struct {
 
 // ServerConfig holds server configuration
 type ServerConfig struct {
-	Port string
+	Port      string
+	Host      string
+	ClientURL string
 }
 
 // LogConfig holds logging configuration
@@ -121,7 +123,9 @@ func loadRedisConfig() RedisConfig {
 
 func loadServerConfig() ServerConfig {
 	return ServerConfig{
-		Port: getEnv("SERVER_PORT", "8080"),
+		Port:      getEnv("SERVER_PORT", "8080"),
+		Host:      getEnv("SERVER_HOST", "http://localhost:8080"),
+		ClientURL: getEnv("CLIENT_URL", "http://localhost:3000"),
 	}
 }
 
