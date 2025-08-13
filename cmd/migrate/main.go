@@ -17,7 +17,7 @@ import (
 
 var (
 	flags = flag.NewFlagSet("migrate", flag.ExitOnError)
-	dir   = flags.String("dir", "migration", "directory with migration files")
+	dir   = flags.String("dir", "src/migration", "directory with migration files")
 )
 
 func main() {
@@ -42,7 +42,7 @@ func main() {
 	}
 
 	// Setup logger
-	logger.SetupLogger(cfg)
+	logger.New(cfg.Log)
 
 	// Use the database connection string from config
 	dbURL := cfg.GetPostgreSQLDSN()
