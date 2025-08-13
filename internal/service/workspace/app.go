@@ -1,14 +1,14 @@
 package workspace
 
 import (
+	"database/sql"
 	delivery "go-server/internal/service/workspace/delivery"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
-func RegisterWorkspaceService(r *gin.Engine, db *gorm.DB, httpClient *http.Client) {
+func RegisterWorkspaceService(r *gin.Engine, db *sql.DB, httpClient *http.Client) {
 	controller := delivery.NewWorkspaceController(db, httpClient)
 	router := delivery.NewWorkspaceRouter(r)
 

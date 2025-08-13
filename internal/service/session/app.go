@@ -1,15 +1,15 @@
 package session
 
 import (
+	"database/sql"
 	delivery "go-server/internal/service/session/delivery"
 	"go-server/pkg/config"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 // RegisterSessionService registers all session service routes
-func RegisterSessionService(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
+func RegisterSessionService(r *gin.Engine, db *sql.DB, cfg *config.Config) {
 	controller := delivery.NewSessionController(db, cfg)
 	router := delivery.NewSessionRouter(r)
 
