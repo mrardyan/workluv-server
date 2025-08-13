@@ -41,11 +41,14 @@ COPY --from=builder /app/main .
 # Copy migration tool
 COPY --from=builder /app/migrate .
 
-# Copy src folder (email templates, migration files, and scripts)
+# Copy src folder (email templates and scripts)
 COPY --from=builder /app/src ./src
 
-# Ensure src directory exists and has proper permissions
-RUN mkdir -p ./src
+# Copy migration folder to root level for the migration tool
+COPY --from=builder /app/migration ./migration
+
+# Ensure directories exist and have proper permissions
+RUN mkdir -p ./src ./migration
 
 # Change ownership to non-root user
 RUN chown -R appuser:appgroup /app

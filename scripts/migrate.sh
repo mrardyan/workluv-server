@@ -367,7 +367,7 @@ run_migration() {
     local command="$1"
     local environment="$2"
     local migration_name="$3"
-    local migration_dir="src/migration"
+    local migration_dir="migration"
     
     # Commands that don't need database connection
     local no_db_commands=("lint" "check-deps" "create" "create-go" "validate")
