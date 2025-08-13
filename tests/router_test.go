@@ -52,7 +52,7 @@ func TestRouterConnections(t *testing.T) {
 	httpClient := infrastructure.NewDefaultHTTPClient()
 
 	// Setup router
-	router := infrastructure.SetupRouter()
+	router := infrastructure.SetupRouter(cfg)
 
 	// Register all routes
 	internal.RegisterHealthRoutes(router, db, redisClient)
@@ -331,7 +331,8 @@ func TestIndividualRouterComponents(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	t.Run("Router Setup", func(t *testing.T) {
-		router := infrastructure.SetupRouter()
+		cfg := config.Load()
+		router := infrastructure.SetupRouter(cfg)
 		if router == nil {
 			t.Fatal("Expected router to be non-nil")
 		}
@@ -339,7 +340,8 @@ func TestIndividualRouterComponents(t *testing.T) {
 	})
 
 	t.Run("Account Router Creation", func(t *testing.T) {
-		router := infrastructure.SetupRouter()
+		cfg := config.Load()
+		router := infrastructure.SetupRouter(cfg)
 		accountRouter := accountDelivery.NewAccountRouter(router)
 		if accountRouter == nil {
 			t.Fatal("Expected account router to be non-nil")
@@ -348,7 +350,8 @@ func TestIndividualRouterComponents(t *testing.T) {
 	})
 
 	t.Run("Workspace Router Creation", func(t *testing.T) {
-		router := infrastructure.SetupRouter()
+		cfg := config.Load()
+		router := infrastructure.SetupRouter(cfg)
 		workspaceRouter := workspaceDelivery.NewWorkspaceRouter(router)
 		if workspaceRouter == nil {
 			t.Fatal("Expected workspace router to be non-nil")
@@ -361,7 +364,8 @@ func TestIndividualRouterComponents(t *testing.T) {
 func TestRouterMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	router := infrastructure.SetupRouter()
+	cfg := config.Load()
+	router := infrastructure.SetupRouter(cfg)
 
 	// Test that router has default Gin middleware (Logger, Recovery)
 	if router == nil {
