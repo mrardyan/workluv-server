@@ -7,7 +7,7 @@
 # This script provides convenient commands for managing database migrations
 # using Goose with PostgreSQL.
 #
-# Usage: ./src/scripts/migrate.sh [command] [environment] [options]
+# Usage: ./scripts/migrate.sh [command] [environment] [options]
 # =============================================================================
 
 # Colors for output
@@ -39,14 +39,17 @@ print_header() {
     echo -e "${BLUE}=== $1 ===${NC}"
 }
 
-# Function to check if goose is installed
-check_goose() {
-    if ! command -v goose &> /dev/null; then
-        print_error "goose is not installed. Please install it first:"
-        echo ""
-        echo "Install via Go:"
-        echo "  go install github.com/pressly/goose/v3/cmd/goose@latest"
-        echo ""
+# Function to check if migration tool is available
+check_migration_tool() {
+    # Check if we're in a container (use binary) or local (use go run)
+    if [ -f "./migrate" ]; then
+        print_status "Using pre-built migration binary"
+        return 0
+    elif [ -f "./cmd/migrate/main.go" ]; then
+        print_status "Using local migration tool (go run)"
+        return 0
+    else
+        print_error "Migration tool not found. Please ensure cmd/migrate/ directory exists."
         exit 1
     fi
 }
@@ -75,7 +78,7 @@ get_db_string() {
     
     if [ ! -f "$env_file" ]; then
         print_error "Environment file not found: $env_file"
-        print_error "Please run ./src/scripts/setup.sh $environment first"
+        print_error "Please run ./scripts/setup.sh $environment first"
         exit 1
     fi
     
@@ -359,12 +362,12 @@ lint_migrations() {
     return 0
 }
 
-# Function to run goose command
-run_goose() {
+# Function to run migration command
+run_migration() {
     local command="$1"
     local environment="$2"
     local migration_name="$3"
-    local migration_dir="migration"
+    local migration_dir="src/migration"
     
     # Commands that don't need database connection
     local no_db_commands=("lint" "check-deps" "create" "create-go" "validate")
@@ -397,7 +400,15 @@ run_goose() {
             if ! validate_migration_name "$migration_name"; then
                 exit 1
             fi
-            goose -dir "$migration_dir" create "$migration_name" sql
+            # Use our migration tool instead of goose
+            if [ -f "./migrate" ]; then
+                ./migrate create "$migration_name"
+            elif [ -f "./cmd/migrate/main.go" ]; then
+                go run ./cmd/migrate/main.go create "$migration_name"
+            else
+                print_error "Migration tool not found"
+                exit 1
+            fi
             # Validate the created file
             local latest_file=$(ls -t "$migration_dir"/*.sql | head -1)
             print_status "Created migration file: $(basename "$latest_file")"
@@ -412,7 +423,15 @@ run_goose() {
             if ! validate_migration_name "$migration_name"; then
                 exit 1
             fi
-            goose -dir "$migration_dir" create "$migration_name" go
+            # Use our migration tool instead of goose
+            if [ -f "./migrate" ]; then
+                ./migrate create "$migration_name"
+            elif [ -f "./cmd/migrate/main.go" ]; then
+                go run ./cmd/migrate/main.go create "$migration_name"
+            else
+                print_error "Migration tool not found"
+                exit 1
+            fi
             ;;
         "validate")
             if [ -n "$migration_name" ]; then
@@ -473,29 +492,70 @@ run_goose() {
             lint_migrations
             ;;
         "up")
-            goose -dir "$migration_dir" postgres "$db_string" up
+            if [ -f "./migrate" ]; then
+                ./migrate up
+            elif [ -f "./cmd/migrate/main.go" ]; then
+                go run ./cmd/migrate/main.go up
+            else
+                print_error "Migration tool not found"
+                exit 1
+            fi
             ;;
         "up-by-one")
-            goose -dir "$migration_dir" postgres "$db_string" up-by-one
+            if [ -f "./migrate" ]; then
+                ./migrate up
+            elif [ -f "./cmd/migrate/main.go" ]; then
+                go run ./cmd/migrate/main.go up
+            else
+                print_error "Migration tool not found"
+                exit 1
+            fi
             ;;
         "down")
-            goose -dir "$migration_dir" postgres "$db_string" down
+            if [ -f "./migrate" ]; then
+                ./migrate down
+            elif [ -f "./cmd/migrate/main.go" ]; then
+                go run ./cmd/migrate/main.go down
+            else
+                print_error "Migration tool not found"
+                exit 1
+            fi
             ;;
         "reset")
             print_warning "This will rollback ALL migrations. Are you sure? (y/N)"
             read -r response
             if [[ "$response" =~ ^[Yy]$ ]]; then
-                goose -dir "$migration_dir" postgres "$db_string" reset
+                if [ -f "./migrate" ]; then
+                    ./migrate reset
+                elif [ -f "./cmd/migrate/main.go" ]; then
+                    go run ./cmd/migrate/main.go reset
+                else
+                    print_error "Migration tool not found"
+                    exit 1
+                fi
             else
                 print_status "Reset cancelled"
                 exit 0
             fi
             ;;
         "status")
-            goose -dir "$migration_dir" postgres "$db_string" status
+            if [ -f "./migrate" ]; then
+                ./migrate status
+            elif [ -f "./cmd/migrate/main.go" ]; then
+                go run ./cmd/migrate/main.go status
+            else
+                print_error "Migration tool not found"
+                exit 1
+            fi
             ;;
         "version")
-            goose -dir "$migration_dir" postgres "$db_string" version
+            if [ -f "./migrate" ]; then
+                ./migrate version
+            elif [ -f "./cmd/migrate/main.go" ]; then
+                go run ./cmd/migrate/main.go version
+            else
+                exit 1
+            fi
             ;;
         *)
             print_error "Unknown command: $command"
@@ -547,9 +607,9 @@ show_help() {
     echo "  $0 check-deps                          # Check migration dependencies"
     echo ""
     echo "Prerequisites:"
-    echo "  - goose (database migration tool)"
-    echo "  - Environment file (.env.development, .env.staging, or .env.production)"
-    echo "  - Database configuration in environment file"
+echo "  - Migration tool (./migrate binary or ./cmd/migrate/main.go)"
+echo "  - Environment file (.env.development, .env.staging, or .env.production)"
+echo "  - Database configuration in environment file"
     echo ""
 }
 
@@ -592,7 +652,7 @@ main() {
     fi
     
     # Check prerequisites
-    check_goose
+    check_migration_tool
     
     # Commands that don't require environment
     local no_env_commands=("lint" "check-deps")
@@ -632,7 +692,7 @@ main() {
     fi
     
     # Run the command
-    run_goose "$command" "$environment" "$migration_name"
+    run_migration "$command" "$environment" "$migration_name"
     
     if [ $? -eq 0 ]; then
         print_success "Migration command completed successfully!"
