@@ -32,12 +32,8 @@ RUN addgroup -g 1001 -S appgroup && \
 # Set working directory
 WORKDIR /app
 
-# Copy binary and startup script from builder stage
+# Copy binary from builder stage
 COPY --from=builder /app/main .
-COPY --from=builder /app/scripts/start.sh .
-
-# Make startup script executable
-RUN chmod +x start.sh
 
 # Change ownership to non-root user
 RUN chown -R appuser:appgroup /app
@@ -52,5 +48,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health/simple || exit 1
 
-# Run the application using startup script
-CMD ["./start.sh"]
+# Run the application directly
+CMD ["./main"]

@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -19,6 +20,15 @@ type HealthResponse struct {
 
 // RegisterHealthRoutes registers health check endpoints
 func RegisterHealthRoutes(router *gin.Engine, db *sql.DB, redisClient *redis.Client) {
+	// Startup health check endpoint (no external dependencies)
+	router.GET("/health/startup", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":    "starting",
+			"timestamp": time.Now(),
+			"message":   "Server is starting up",
+		})
+	})
+
 	// Main health check endpoint (includes all service checks)
 	router.GET("/health", func(c *gin.Context) {
 		health := HealthResponse{
@@ -35,12 +45,16 @@ func RegisterHealthRoutes(router *gin.Engine, db *sql.DB, redisClient *redis.Cli
 			health.Services["database"] = "healthy"
 		}
 
-		// Check Redis health
-		if err := checkRedisHealth(redisClient); err != nil {
-			health.Status = "unhealthy"
-			health.Services["redis"] = "unhealthy: " + err.Error()
+		// Check Redis health (if available)
+		if redisClient != nil {
+			if err := checkRedisHealth(redisClient); err != nil {
+				health.Status = "unhealthy"
+				health.Services["redis"] = "unhealthy: " + err.Error()
+			} else {
+				health.Services["redis"] = "healthy"
+			}
 		} else {
-			health.Services["redis"] = "healthy"
+			health.Services["redis"] = "not_configured"
 		}
 
 		// Set appropriate HTTP status code
@@ -78,12 +92,16 @@ func RegisterHealthRoutes(router *gin.Engine, db *sql.DB, redisClient *redis.Cli
 			health.Services["database"] = "ready"
 		}
 
-		// Check Redis readiness
-		if err := checkRedisHealth(redisClient); err != nil {
-			health.Status = "not_ready"
-			health.Services["redis"] = "not_ready: " + err.Error()
+		// Check Redis readiness (if available)
+		if redisClient != nil {
+			if err := checkRedisHealth(redisClient); err != nil {
+				health.Status = "not_ready"
+				health.Services["redis"] = "not_ready: " + err.Error()
+			} else {
+				health.Services["redis"] = "ready"
+			}
 		} else {
-			health.Services["redis"] = "ready"
+			health.Services["redis"] = "not_configured"
 		}
 
 		// Set appropriate HTTP status code
@@ -103,6 +121,10 @@ func checkDatabaseHealth(db *sql.DB) error {
 }
 
 func checkRedisHealth(redisClient *redis.Client) error {
+	if redisClient == nil {
+		return fmt.Errorf("Redis client not configured")
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

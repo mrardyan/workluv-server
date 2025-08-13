@@ -108,14 +108,6 @@ These must be changed in production:
 - `RATE_LIMIT_REQUESTS` - Maximum requests per window
 - `RATE_LIMIT_WINDOW` - Rate limiting time window
 
-### Redis Configuration
-- `REDIS_HOST` - Redis server host
-- `REDIS_PORT` - Redis server port
-- `REDIS_PASSWORD` - Redis password
-- `REDIS_DB` - Redis database number
-- `REDIS_TIMEOUT` - Redis connection timeout
-- `REDIS_POOL_SIZE` - Redis connection pool size
-
 ### Deployment Configuration
 - `DO_APP_ID` - DigitalOcean App Platform app ID
 - `DO_APP_NAME` - DigitalOcean App Platform app name
