@@ -1,180 +1,277 @@
-# Environment Templates
+# Environment Configuration Templates
 
-This directory contains environment configuration templates for different deployment environments.
+This directory contains environment variable templates for different deployment environments.
 
 ## Overview
 
-The environment templates provide a standardized way to configure the application across different environments (development, staging, production). These templates are automatically copied to the project root during setup.
+The environment templates provide a standardized way to configure your Go server application across different deployment stages. Each template includes all necessary configuration variables with appropriate defaults and documentation.
 
-## Template Files
+## Available Templates
 
-- `env.development.template` - Development environment configuration
-- `env.staging.template` - Staging environment configuration  
-- `env.production.template` - Production environment configuration
+- **`env.development.template`** - Development environment configuration
+- **`env.staging.template`** - Staging environment configuration  
+- **`env.production.template`** - Production environment configuration
 
-## Usage
+## Quick Setup
 
-### Automatic Setup
-The setup script automatically creates environment files from these templates:
+### 1. Setup Environment Files
 
-```bash
-./scripts/setup.sh
-```
-
-This will create:
-- `.env.development` (from `env.development.template`)
-- `.env.staging` (from `env.staging.template`)
-- `.env.production` (from `env.production.template`)
-
-### Manual Setup
-If you need to create environment files manually:
+Use the setup script to create environment files from templates:
 
 ```bash
-# Copy templates to project root
-cp templates/env/env.development.template .env.development
-cp templates/env/env.staging.template .env.staging
-cp templates/env/env.production.template .env.production
+# Setup development environment
+./src/scripts/setup.sh dev
+
+# Setup staging environment
+./src/scripts/setup.sh staging
+
+# Setup production environment
+./src/scripts/setup.sh prod
+
+# Setup all environments at once
+./src/scripts/setup.sh all
 ```
 
-## Configuration Categories
+### 2. Configure Your Values
 
-### Security Critical Variables
-These must be changed in production:
-- `JWT_SECRET` - Secret key for JWT token signing
-- `EMAIL_SMTP_USERNAME` - SMTP username for email service
-- `EMAIL_SMTP_PASSWORD` - SMTP password for email service
+Edit the generated `.env.[environment]` files with your actual values:
 
-### Environment Configuration
-- `ENVIRONMENT` - Current environment (development/staging/production)
-- `CLIENT_URL` - Frontend application URL
+```bash
+# Edit development environment
+nano .env.development
 
-### Server Configuration
-- `SERVER_HOST` - Server host address
-- `SERVER_PORT` - Server port number
-- `HTTP_PORT` - HTTP port number
-- `SERVER_READ_TIMEOUT` - Request read timeout
-- `SERVER_WRITE_TIMEOUT` - Response write timeout
-- `SERVER_IDLE_TIMEOUT` - Connection idle timeout
+# Edit staging environment
+nano .env.staging
 
-### Database Configuration
-- `DATABASE_URL` - Database connection string (managed by DigitalOcean)
-- `DB_SSL_MODE` - Database SSL mode
-- `DB_MAX_OPEN_CONNS` - Maximum open database connections
-- `DB_MAX_IDLE_CONNS` - Maximum idle database connections
-- `DB_CONN_MAX_LIFETIME` - Database connection lifetime
+# Edit production environment
+nano .env.production
+```
 
-### Logging Configuration
-- `LOG_LEVEL` - Logging level (debug/info/warn/error)
-- `LOG_FORMAT` - Log format (json/text)
-- `LOG_OUTPUT` - Log output destination
-- `LOG_TIME_FORMAT` - Timestamp format
-- `LOG_CALLER` - Include caller information
+## Environment Variable Categories
 
-### Monitoring Configuration
-- `METRICS_ENABLED` - Enable metrics collection
-- `METRICS_PORT` - Metrics server port
-- `HEALTH_CHECK_PATH` - Health check endpoint
-- `READINESS_PATH` - Readiness probe endpoint
-- `LIVENESS_PATH` - Liveness probe endpoint
-- `PROMETHEUS_PATH` - Prometheus metrics endpoint
+### Server Configuration (Build-Time)
 
-### Feature Flags
-- `FEATURE_USER_REGISTRATION` - Enable user registration
-- `FEATURE_EMAIL_VERIFICATION` - Enable email verification
-- `FEATURE_PASSWORD_RESET` - Enable password reset
-- `FEATURE_MULTI_TENANCY` - Enable multi-tenancy
-- `FEATURE_AUDIT_LOGGING` - Enable audit logging
+These variables are used during the build process and can be included in DigitalOcean app specs:
 
-### Email Service Configuration
-- `EMAIL_SERVICE_ENABLED` - Enable email service
-- `EMAIL_SERVICE_PROVIDER` - Email service provider
-- `EMAIL_SMTP_HOST` - SMTP server host
-- `EMAIL_SMTP_PORT` - SMTP server port
-- `EMAIL_SMTP_USE_TLS` - Use TLS for SMTP
-- `EMAIL_SMTP_USE_SSL` - Use SSL for SMTP
-- `EMAIL_FROM_ADDRESS` - Default sender email
-- `EMAIL_FROM_NAME` - Default sender name
-- `EMAIL_TEMPLATE_DIR` - Email template directory
+```bash
+# Server Settings
+SERVER_HOST=0.0.0.0
+SERVER_PORT=8080
+SERVER_READ_TIMEOUT=30s
+SERVER_WRITE_TIMEOUT=30s
+SERVER_IDLE_TIMEOUT=60s
+SERVER_MAX_HEADER_BYTES=1048576
 
-### Security Configuration
-- `JWT_EXPIRATION` - JWT token expiration time
-- `SESSION_EXPIRATION` - Session expiration time
-- `BCRYPT_COST` - Bcrypt hashing cost
+# Application Settings
+ENVIRONMENT=development
+GO_ENV=development
+GIN_MODE=debug
+HTTP_PORT=8080
 
-### CORS Configuration
-- `CORS_ALLOWED_ORIGINS` - Allowed CORS origins
+# Feature Flags
+FEATURE_USER_REGISTRATION=true
+FEATURE_EMAIL_VERIFICATION=true
+FEATURE_PASSWORD_RESET=true
+FEATURE_MULTI_TENANCY=true
+FEATURE_AUDIT_LOGGING=true
 
-### Rate Limiting
-- `RATE_LIMIT_REQUESTS` - Maximum requests per window
-- `RATE_LIMIT_WINDOW` - Rate limiting time window
+# Logging
+LOG_LEVEL=debug
+LOG_FORMAT=json
+LOG_OUTPUT=stdout
+LOG_TIME_FORMAT=2006-01-02T15:04:05Z07:00
+LOG_CALLER=true
 
-### Deployment Configuration
-- `DO_APP_ID` - DigitalOcean App Platform app ID
-- `DO_APP_NAME` - DigitalOcean App Platform app name
+# Monitoring
+METRICS_ENABLED=true
+METRICS_PORT=9090
+PROMETHEUS_PATH=/metrics
+```
 
-## Security Best Practices
+### Database Configuration (Runtime-Only)
 
-### 1. Never Commit Environment Files
-Environment files (`.env.*`) are automatically added to `.gitignore` to prevent accidental commits.
+Database connection details are managed by DigitalOcean and injected at runtime:
 
-### 2. Use Environment-Specific Secrets
-- Development: Use development-specific secrets
-- Staging: Use staging-specific secrets  
-- Production: Use production-specific secrets
+```bash
+# DATABASE_URL is managed by DigitalOcean and injected at runtime
+DATABASE_URL=${db.DATABASE_URL}
 
-### 3. Secure Secret Management
-For production deployments:
-- Use DigitalOcean App Platform secrets
-- Use environment variables for sensitive data
-- Never hardcode secrets in templates
+# Database Settings
+DB_SSL_MODE=require
+DB_MAX_OPEN_CONNS=25
+DB_MAX_IDLE_CONNS=5
+DB_CONN_MAX_LIFETIME=300s
+```
 
-### 4. Template vs Environment Files
-- **Templates**: Contain placeholder values and documentation
-- **Environment Files**: Contain actual configuration values
+### External Service Secrets (Runtime-Only)
 
-## Environment-Specific Considerations
+Sensitive configuration that should never be committed to version control:
+
+```bash
+# JWT Secrets (Runtime-Only)
+JWT_SECRET=your-super-secret-jwt-key-here
+JWT_REFRESH_SECRET=your-super-secret-refresh-key-here
+JWT_EXPIRATION=15m
+SESSION_EXPIRATION=7d
+
+# Email Configuration (Runtime-Only)
+EMAIL_SERVICE_ENABLED=true
+EMAIL_SERVICE_PROVIDER=smtp
+EMAIL_SMTP_HOST=smtp.gmail.com
+EMAIL_SMTP_PORT=587
+EMAIL_SMTP_USE_TLS=true
+EMAIL_SMTP_USE_SSL=false
+EMAIL_SMTP_USERNAME=your-email@gmail.com
+EMAIL_SMTP_PASSWORD=your-app-password
+EMAIL_FROM_ADDRESS=noreply@yourdomain.com
+EMAIL_FROM_NAME=Your App Name
+EMAIL_TEMPLATE_DIR=src/email
+
+# Security
+BCRYPT_COST=12
+CORS_ALLOWED_ORIGINS=http://localhost:3000,https://yourdomain.com
+RATE_LIMIT_REQUESTS=100
+RATE_LIMIT_WINDOW=1m
+```
+
+### DigitalOcean Configuration (Runtime-Only)
+
+DigitalOcean-specific settings for App Platform:
+
+```bash
+# DigitalOcean App Platform
+DO_APP_ID=your-app-id
+DO_APP_NAME=your-app-name
+TRUSTED_PROXIES=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+```
+
+## Environment-Specific Configurations
 
 ### Development
-- Uses debug logging level
-- Allows localhost CORS origins
-- Uses development-specific secrets
-- Enables all features for testing
+
+- **Logging**: Debug level with detailed output
+- **Features**: All features enabled for testing
+- **Security**: Relaxed settings for development
+- **Database**: Local or development database
 
 ### Staging
-- Uses info logging level
-- Allows staging domain CORS origins
-- Uses staging-specific secrets
-- Mirrors production configuration
+
+- **Logging**: Info level with structured output
+- **Features**: Production-like feature configuration
+- **Security**: Production-like security settings
+- **Database**: Staging database cluster
 
 ### Production
-- Uses info logging level
-- Allows production domain CORS origins
-- Uses production-specific secrets
-- Optimized for performance and security
+
+- **Logging**: Warning level with minimal output
+- **Features**: Production feature configuration
+- **Security**: Strict security settings
+- **Database**: Production database cluster
+
+## Security Considerations
+
+### Never Commit These Files
+
+- `.env.development`
+- `.env.staging`
+- `.env.production`
+
+### Use DigitalOcean Secrets
+
+For production deployments, use DigitalOcean's secure environment variable storage:
+
+```bash
+# In DigitalOcean App Platform
+JWT_SECRET=${JWT_SECRET}  # Set as secret in DO dashboard
+EMAIL_SMTP_PASSWORD=${EMAIL_SMTP_PASSWORD}  # Set as secret in DO dashboard
+```
+
+### Rotate Secrets Regularly
+
+- JWT secrets
+- Database passwords
+- SMTP credentials
+- API keys
+
+## Validation
+
+### 1. Check Required Variables
+
+Ensure all required variables are set:
+
+```bash
+# Check for missing required variables
+./src/scripts/setup.sh validate
+```
+
+### 2. Test Configuration
+
+Test your configuration before deploying:
+
+```bash
+# Test development configuration
+./src/scripts/deploy.sh dev generate
+
+# Test staging configuration
+./src/scripts/deploy.sh staging generate
+
+# Test production configuration
+./src/scripts/deploy.sh prod generate
+```
 
 ## Troubleshooting
 
-### Template Not Found
-If you get "Template file not found" error:
-1. Check that template files exist in `templates/env/`
-2. Verify file permissions
-3. Ensure setup script is run from project root
+### Common Issues
 
-### Environment File Not Created
-If environment files aren't created:
-1. Run `./scripts/setup.sh` again
-2. Check for existing `.env.*` files
-3. Verify template file paths
+1. **Missing Environment File**
+   ```bash
+   # Create from template
+   ./src/scripts/setup.sh dev
+   ```
 
-### Configuration Not Applied
-If configuration changes aren't applied:
-1. Restart the application
-2. Check environment variable loading
-3. Verify configuration file paths
+2. **Invalid Variable Values**
+   - Check variable format and syntax
+   - Ensure proper escaping for special characters
+   - Verify environment-specific requirements
+
+3. **Configuration Conflicts**
+   - Check for duplicate variable definitions
+   - Verify environment variable precedence
+   - Ensure proper scope classification
+
+### Debug Mode
+
+Enable debug output to troubleshoot configuration issues:
+
+```bash
+export DEBUG=true
+./src/scripts/setup.sh dev
+```
+
+## Best Practices
+
+### 1. Environment Separation
+
+- Keep development, staging, and production completely separate
+- Use different secrets for each environment
+- Never share production credentials with development
+
+### 2. Configuration Management
+
+- Use templates for consistency
+- Document all configuration changes
+- Validate configuration before deployment
+
+### 3. Security
+
+- Never commit secrets to version control
+- Use DigitalOcean's secure storage for production
+- Rotate secrets regularly
+- Follow principle of least privilege
 
 ## Related Documentation
 
-- [Configuration Management](../03-development/configuration/)
-- [Environment Setup](../03-development/environment/)
-- [Deployment Guide](../04-deployment/)
-- [Security Guidelines](../06-security/)
+- [Setup Script](../src/scripts/setup.sh) - Environment setup automation
+- [Deploy Script](../src/scripts/deploy.sh) - Deployment configuration
+- [Migration Script](../src/scripts/migrate.sh) - Database configuration
+- [Deployment Guide](../../DEPLOYMENT.md) - Production deployment

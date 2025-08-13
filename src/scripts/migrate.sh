@@ -7,7 +7,7 @@
 # This script provides convenient commands for managing database migrations
 # using Goose with PostgreSQL.
 #
-# Usage: ./scripts/migrate.sh [command] [environment] [options]
+# Usage: ./src/scripts/migrate.sh [command] [environment] [options]
 # =============================================================================
 
 # Colors for output
@@ -75,7 +75,7 @@ get_db_string() {
     
     if [ ! -f "$env_file" ]; then
         print_error "Environment file not found: $env_file"
-        print_error "Please run ./scripts/setup.sh $environment first"
+        print_error "Please run ./src/scripts/setup.sh $environment first"
         exit 1
     fi
     

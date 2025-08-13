@@ -7,7 +7,7 @@
 # This script helps set up environment files for deployment and configures
 # GitHub repository integration for DigitalOcean App Platform.
 #
-# Usage: ./scripts/setup.sh [environment] [--github USERNAME REPO]
+# Usage: ./src/scripts/setup.sh [environment] [--github USERNAME REPO]
 # =============================================================================
 
 # Colors for output
@@ -294,7 +294,7 @@ show_github_next_steps() {
     echo "   git push -u origin main"
     echo ""
     echo "3. Deploy to development:"
-    echo "   ./scripts/deploy.sh dev create"
+    echo "   ./src/scripts/deploy.sh dev create"
     echo ""
 }
 
@@ -337,9 +337,9 @@ show_env_next_steps() {
     echo ""
     echo "3. Deploy your application:"
     if [ "$environment" = "all" ]; then
-        echo "   ./scripts/deploy.sh dev create    # Start with development"
+        echo "   ./src/scripts/deploy.sh dev create    # Start with development"
     else
-        echo "   ./scripts/deploy.sh $environment deploy"
+        echo "   ./src/scripts/deploy.sh $environment deploy"
     fi
     echo ""
 }

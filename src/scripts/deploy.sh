@@ -7,7 +7,7 @@
 # This script handles deployment to DigitalOcean App Platform with proper
 # secrets management. It generates app specs from .env files and deploys them.
 #
-# Usage: ./scripts/deploy.sh [environment] [action]
+# Usage: ./src/scripts/deploy.sh [environment] [action]
 # =============================================================================
 
 set -e
@@ -218,7 +218,7 @@ generate_app_spec() {
                     scope="RUN_AND_BUILD_TIME"
                     ;;
                 # Runtime-only variables (secrets and sensitive data)
-                JWT_SECRET|JWT_REFRESH_SECRET|EMAIL_SMTP_USERNAME|EMAIL_SMTP_PASSWORD|DATABASE_URL|REDIS_HOST|REDIS_PORT|REDIS_PASSWORD|REDIS_DB|REDIS_TIMEOUT|REDIS_POOL_SIZE|DO_APP_ID|DO_APP_NAME|TRUSTED_PROXIES)
+                JWT_SECRET|JWT_REFRESH_SECRET|EMAIL_SMTP_USERNAME|EMAIL_SMTP_PASSWORD|DATABASE_URL|DO_APP_ID|DO_APP_NAME|TRUSTED_PROXIES)
                     scope="RUN_TIME"
                     ;;
                 # Default to runtime
@@ -478,7 +478,7 @@ show_env_setup() {
     echo "   - EMAIL_SMTP_PASSWORD"
     echo ""
     echo "4. Deploy your application:"
-    echo "   ./scripts/deploy.sh dev deploy"
+    echo "   ./src/scripts/deploy.sh dev create"
     echo ""
 }
 
@@ -500,11 +500,11 @@ verify_deployment() {
         print_success "App is running successfully!"
     elif [ "$status" = "BUILDING" ] || [ "$status" = "DEPLOYING" ]; then
         print_warning "App is still deploying. Status: $status"
-        print_status "You can check status with: ./scripts/deploy.sh $environment status"
-        print_status "View logs with: ./scripts/deploy.sh $environment logs"
+        print_status "You can check status with: ./src/scripts/deploy.sh $environment status"
+        print_status "View logs with: ./src/scripts/deploy.sh $environment logs"
     else
         print_warning "App status: $status"
-        print_status "Check logs for details: ./scripts/deploy.sh $environment logs"
+        print_status "Check logs for details: ./src/scripts/deploy.sh $environment logs"
     fi
     
     # Show app URL if available

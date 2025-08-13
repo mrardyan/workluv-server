@@ -37,20 +37,21 @@ doctl auth list
 Ensure your project has the following structure:
 ```
 go-server/
-├── scripts/
-│   ├── deploy.sh      # Main deployment script
-│   └── setup.sh       # Environment setup script
+├── src/
+│   └── scripts/
+│       ├── deploy.sh      # Main deployment script
+│       └── setup.sh       # Environment setup script
 ├── templates/
-│   ├── do/            # DigitalOcean app templates
+│   ├── do/                # DigitalOcean app templates
 │   │   ├── app-development.template.yaml
 │   │   ├── app-staging.template.yaml
 │   │   └── app-production.template.yaml
-│   └── env/           # Environment templates
+│   └── env/               # Environment templates
 │       ├── env.development.template
 │       ├── env.staging.template
 │       └── env.production.template
-├── Dockerfile         # Container configuration
-└── go.mod            # Go module file
+├── Dockerfile             # Container configuration
+└── go.mod                # Go module file
 ```
 
 ## Quick Start
@@ -60,7 +61,7 @@ go-server/
 First, check if you have all required tools installed:
 
 ```bash
-./scripts/test-prerequisites.sh
+./src/scripts/test-prerequisites.sh
 ```
 
 This will check for:
@@ -74,13 +75,13 @@ This will check for:
 
 ```bash
 # Setup development environment
-./scripts/setup.sh dev
+./src/scripts/setup.sh dev
 
 # Setup staging environment
-./scripts/setup.sh staging
+./src/scripts/setup.sh staging
 
 # Setup production environment
-./scripts/setup.sh prod
+./src/scripts/setup.sh prod
 ```
 
 **Note**: The setup script will automatically check all prerequisites before proceeding.
@@ -110,13 +111,13 @@ nano .env.production
 
 ```bash
 # Deploy to development
-./scripts/deploy.sh dev deploy
+./src/scripts/deploy.sh dev deploy
 
 # Deploy to staging
-./scripts/deploy.sh staging deploy
+./src/scripts/deploy.sh staging deploy
 
 # Deploy to production
-./scripts/deploy.sh prod deploy
+./src/scripts/deploy.sh prod deploy
 ```
 
 ## Deployment Scripts
@@ -129,7 +130,7 @@ The deployment system includes several scripts to help you manage your deploymen
 Tests all prerequisites and provides installation instructions for missing tools.
 
 ```bash
-./scripts/test-prerequisites.sh
+./src/scripts/test-prerequisites.sh
 ```
 
 **What it checks:**
@@ -143,7 +144,7 @@ Tests all prerequisites and provides installation instructions for missing tools
 Sets up environment files from templates with automatic prerequisite checking.
 
 ```bash
-./scripts/setup.sh [environment]
+./src/scripts/setup.sh [environment]
 ```
 
 **Features:**
@@ -155,7 +156,7 @@ Sets up environment files from templates with automatic prerequisite checking.
 Configures your GitHub repository information in all DigitalOcean templates.
 
 ```bash
-./scripts/configure-github.sh [github_username] [repository_name]
+./src/scripts/configure-github.sh [github_username] [repository_name]
 ```
 
 **What it does:**
@@ -168,7 +169,7 @@ Configures your GitHub repository information in all DigitalOcean templates.
 Handles all deployment operations to DigitalOcean App Platform.
 
 ```bash
-./scripts/deploy.sh [environment] [action]
+./src/scripts/deploy.sh [environment] [action]
 ```
 
 ### Main Deployment Script (`deploy.sh`)
@@ -181,7 +182,7 @@ The main deployment script handles:
 
 **Usage:**
 ```bash
-./scripts/deploy.sh [environment] [action]
+./src/scripts/deploy.sh [environment] [action]
 ```
 
 **Environments:**
@@ -200,19 +201,19 @@ The main deployment script handles:
 **Examples:**
 ```bash
 # Deploy to development
-./scripts/deploy.sh dev deploy
+./src/scripts/deploy.sh dev deploy
 
 # Create new production app
-./scripts/deploy.sh prod create
+./src/scripts/deploy.sh prod create
 
 # Generate staging spec only
-./scripts/deploy.sh staging generate
+./src/scripts/deploy.sh staging generate
 
 # View development logs
-./scripts/deploy.sh dev logs
+./src/scripts/deploy.sh dev logs
 
 # Check production status
-./scripts/deploy.sh prod status
+./src/scripts/deploy.sh prod status
 ```
 
 ### Environment Setup Script (`setup.sh`)
@@ -221,19 +222,19 @@ The setup script helps create environment files from templates.
 
 **Usage:**
 ```bash
-./scripts/setup.sh [environment]
+./src/scripts/setup.sh [environment]
 ```
 
 **Examples:**
 ```bash
 # Setup development environment
-./scripts/setup.sh dev
+./src/scripts/setup.sh dev
 
 # Setup staging environment
-./scripts/setup.sh staging
+./src/scripts/setup.sh staging
 
 # Setup production environment
-./scripts/setup.sh prod
+./src/scripts/setup.sh prod
 ```
 
 ## Environment Configuration
@@ -253,7 +254,6 @@ The deployment system automatically classifies environment variables:
 - JWT secrets
 - Database credentials
 - SMTP credentials
-- Redis configuration
 - External service keys
 
 ### Environment-Specific Settings
@@ -330,7 +330,7 @@ Configured alerts for:
 2. **Missing Environment Files**
    ```bash
    # Create environment files
-   ./scripts/setup.sh [environment]
+   ./src/scripts/setup.sh [environment]
    ```
 
 3. **Template Not Found**
@@ -340,10 +340,10 @@ Configured alerts for:
 4. **Deployment Failures**
    ```bash
    # Check app status
-   ./scripts/deploy.sh [environment] status
+   ./src/scripts/deploy.sh [environment] status
    
    # View logs
-   ./scripts/deploy.sh [environment] logs
+   ./src/scripts/deploy.sh [environment] logs
    ```
 
 ### Debug Mode
@@ -351,7 +351,7 @@ Configured alerts for:
 Enable debug output by setting:
 ```bash
 export DEBUG=true
-./scripts/deploy.sh [environment] [action]
+./src/scripts/deploy.sh [environment] [action]
 ```
 
 ## Security Considerations

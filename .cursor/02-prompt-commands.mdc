@@ -1,281 +1,266 @@
----
-description: Defines prompt prefix commands for streamlined development workflow automation.
-alwaysApply: false
----
 
-# Prompt Command Prefixes
+# Prompt Commands
 
-## Overview
-These prompt prefix commands provide a streamlined way to trigger common development tasks through natural language commands. When the user types these prefixes, the AI should immediately recognize and execute the corresponding workflow.
+This file contains commonly used commands and shortcuts for development tasks.
 
-## Commit Commands
+## Database Migrations
 
-### 1. `commit batch:`
-**Purpose**: Commit all changes in organized batches per module/feature/structure
-**Behavior**: 
-- Analyze all staged/unstaged changes
-- Group changes logically by architecture layers and modules
-- Create multiple focused commits in dependency order
-- Follow commit standards from `.cursor/02-commit-standards.mdc`
-
-**Commit Order (Most Independent First)**:
-1. **Project setup files** (go.mod, docker-compose.yaml, Dockerfile, scripts)
-2. **Core application structure** (cmd/, main.go, health.go)
-3. **Infrastructure layer** (internal/infrastructure/)
-4. **Service modules** (internal/service/user/, internal/service/workspace/)
-5. **Configuration packages** (pkg/config/, pkg/logger/)
-6. **Database migrations** (migration/)
-7. **Docker/deployment setup** (templates/do/, DEPLOYMENT.md)
-8. **Scripts** (scripts/)
-9. **Templates** (templates/)
-10. **Testing infrastructure** (tests/)
-11. **Documentation** (README.md files, .cursor/)
-
-**Example Execution**:
+### Create New Migration
 ```bash
-# User types: "commit batch:"
-# AI executes:
-git add scripts/
-git commit -m "chore(scripts): update deployment and migration scripts"
-
-git add internal/infrastructure/
-git commit -m "feat(infrastructure): add database and network configuration"
-
-git add internal/service/user/
-git commit -m "feat(user-service): implement user management endpoints"
-
-# ... continue with logical grouping
+# Create a new migration (REQUIRED - never create manually)
+./src/scripts/migrate.sh create add_user_roles dev
+./src/scripts/migrate.sh create create_audit_table dev
+./src/scripts/migrate.sh create update_workspace_permissions dev
 ```
 
-### 2. `commit all:`
-**Purpose**: Commit all changes at once with a comprehensive message
-**Behavior**:
-- Stage all changes
-- Create single commit with descriptive message covering all changes
-- Use appropriate scope and type based on dominant change type
-- Include detailed body listing all modifications
-
-**Example Execution**:
+### Apply Migrations
 ```bash
-# User types: "commit all:"
-# AI executes:
-git add .
-git commit -m "feat(services): implement user and workspace services with infrastructure
+# Apply all pending migrations
+./src/scripts/migrate.sh up dev
 
-- Add user service with CRUD operations
-- Add workspace service with management capabilities  
-- Implement database infrastructure with GORM
-- Add HTTP routing and middleware setup
-- Include migration scripts and templates
-- Update documentation and deployment configs"
+# Apply one migration at a time
+./src/scripts/migrate.sh up-by-one dev
+
+# Rollback last migration
+./src/scripts/migrate.sh down dev
+
+# Check migration status
+./src/scripts/migrate.sh status dev
+
+# View current version
+./src/scripts/migrate.sh version dev
 ```
 
-### 3. `commit <module/layer/context>:`
-**Purpose**: Commit only changes related to a specific module, layer, or context
-**Behavior**:
-- Identify files related to the specified scope
-- Stage only relevant changes
-- Create focused commit for that specific area
-- Use appropriate scope in commit message
-
-**Supported Contexts**:
-- **Modules**: `user-service`, `workspace-service`, `infrastructure`, `config`
-- **Layers**: `domain`, `delivery`, `repository`, `usecase`
-- **Areas**: `docs`, `tests`, `migration`, `scripts`, `templates`, `docker`
-
-**Example Execution**:
+### Validate Migrations
 ```bash
-# User types: "commit user-service:"
-# AI executes:
-git add internal/service/user/
-git commit -m "feat(user-service): implement user management with CRUD operations"
+# Validate all migrations
+./src/scripts/migrate.sh validate
 
-# User types: "commit domain:"
-# AI executes:
-git add internal/service/*/domain/
-git commit -m "feat(domain): add business logic and entities for all services"
+# Validate specific migration
+./src/scripts/migrate.sh validate migration_name
 
-# User types: "commit docs:"
-# AI executes:
-git add README.md */README.md .cursor/
-git commit -m "docs: update service documentation and development rules"
+# Lint for common issues
+./src/scripts/migrate.sh lint
+
+# Check dependencies
+./src/scripts/migrate.sh check-deps
 ```
 
-## Migration Commands
-
-### 4. `create migration:`
-**Purpose**: Create a new database migration using proper naming conventions
-**Behavior**:
-- Extract migration name from the command
-- Validate naming conventions (snake_case, action verbs)
-- Use migration script with proper timestamp generation
-- Open generated migration file for editing
-- Follow migration rules from `.cursor/05-migration-rules.mdc`
-
-**Command Format**: `create migration: <descriptive_name> [environment]`
-
-**Example Execution**:
+### Test Migrations
 ```bash
-# User types: "create migration: add_user_roles dev"
-# AI executes:
-./scripts/migrate.sh create add_user_roles dev
+# Test specific migration (up and down)
+./src/scripts/migrate.sh test migration_name dev
 
-# User types: "create migration: create_audit_table"
-# AI executes (defaults to dev environment):
-./scripts/migrate.sh create create_audit_table dev
+# Reset all migrations (development only)
+./src/scripts/migrate.sh reset dev
 ```
 
-**Validation Rules**:
-- Must use snake_case naming
-- Must start with action verbs: `add_`, `create_`, `remove_`, `drop_`, `update_`, `alter_`, `fix_`, `migrate_`, `seed_`
-- Must not use generic names like `migration1`, `update`, `fix`
-- Must include affected table names when applicable
+## Environment Setup
 
-## Build and Test Commands
-
-### 5. `build and test:`
-**Purpose**: Build and test the project before proceeding with changes
-**Behavior**:
-- Run go build to check compilation
-- Execute test suite
-- Report any issues found
-- Stop workflow if build/tests fail
-
-**Example Execution**:
+### Setup Environment Files
 ```bash
-# User types: "build and test:"
-# AI executes:
-go mod tidy
-go build ./cmd/server/
-go test ./...
-docker-compose build --no-cache
+# Setup development environment
+./src/scripts/setup.sh dev
+
+# Setup staging environment
+./src/scripts/setup.sh staging
+
+# Setup production environment
+./src/scripts/setup.sh prod
+
+# Setup all environments
+./src/scripts/setup.sh all
 ```
 
-## Deployment Commands
-
-### 6. `deploy to:`
-**Purpose**: Deploy application to specified environment
-**Behavior**:
-- Validate environment (development, staging, production)
-- Use appropriate deployment template
-- Execute deployment script with environment-specific configs
-
-**Command Format**: `deploy to: <environment>`
-
-**Example Execution**:
+### Setup with GitHub Integration
 ```bash
-# User types: "deploy to: staging"
-# AI executes:
-./scripts/deploy.sh staging
+# Setup development + GitHub config
+./src/scripts/setup.sh dev --github username repo-name
 
-# Uses templates/do/app-staging.template.yaml
-# Applies staging environment variables
+# Setup all environments + GitHub config
+./src/scripts/setup.sh all --github username repo-name
 ```
 
-## Development Workflow Commands
+## Deployment
 
-### 7. `setup project:`
-**Purpose**: Initialize or reset project development environment
-**Behavior**:
-- Run setup script
-- Initialize database
-- Apply migrations
-- Start development services
-
-**Example Execution**:
+### DigitalOcean App Platform
 ```bash
-# User types: "setup project:"
-# AI executes:
-./scripts/setup.sh
-./scripts/migrate.sh up dev
-docker-compose up -d postgres redis
+# Deploy to development
+./src/scripts/deploy.sh dev deploy
+
+# Deploy to staging
+./src/scripts/deploy.sh staging deploy
+
+# Deploy to production
+./src/scripts/deploy.sh prod deploy
+
+# Create new app
+./src/scripts/deploy.sh dev create
+./src/scripts/deploy.sh staging create
+./src/scripts/deploy.sh prod create
 ```
 
-### 8. `clean temp:`
-**Purpose**: Clean up temporary files and directories
-**Behavior**:
-- Remove `.temp` directory contents
-- Clean up temporary test files
-- Remove build artifacts
-
-**Example Execution**:
+### App Management
 ```bash
-# User types: "clean temp:"
-# AI executes:
-rm -rf .temp/*
-go clean
-docker system prune -f
+# Check app status
+./src/scripts/deploy.sh dev status
+./src/scripts/deploy.sh staging status
+./src/scripts/deploy.sh prod status
+
+# View app logs
+./src/scripts/deploy.sh dev logs
+./src/scripts/deploy.sh staging logs
+./src/scripts/deploy.sh prod logs
+
+# List all apps
+./src/scripts/deploy.sh list
 ```
 
-## Command Recognition Rules
-
-### Pattern Matching
-- Commands are case-insensitive
-- Trailing colons are required for recognition
-- Additional text after colon is treated as parameters
-- Commands can be embedded in natural language sentences
-
-### Error Handling
-- Invalid commands should prompt for clarification
-- Missing parameters should request required information
-- Failed operations should report specific error messages
-- Always validate before executing destructive operations
-
-### Confirmation Requirements
-Commands requiring confirmation:
-- `commit all:` (if many changes)
-- `deploy to: production`
-- `clean temp:` (if contains important files)
-- Migration creation (validate naming first)
-
-## Integration with Development Rules
-
-These commands work in conjunction with:
-- **General Rules** (`.cursor/01-general-rules.mdc`): Code quality and Go idioms
-- **Commit Standards** (`.cursor/02-commit-standards.mdc`): Commit message formatting
-- **Service Template** (`.cursor/03-service-template.mdc`): Service architecture consistency
-- **Temporary Folder** (`.cursor/04-temporary-folder.mdc`): Temp file management
-- **Migration Rules** (`.cursor/05-migration-rules.mdc`): Database migration standards
-
-## Best Practices
-
-### Command Usage
-- Use `commit batch:` for complex multi-module changes
-- Use `commit all:` for simple, cohesive changes
-- Use specific scope commits during focused development
-- Always use migration script for database changes
-- Test before committing or deploying
-
-### Workflow Integration
-- Commands should be self-documenting
-- Operations should be idempotent where possible
-- Always validate before executing
-- Provide clear feedback on command execution
-- Follow project conventions and standards
-
-## Examples of Natural Language Usage
-
-```
-User: "I've made changes to the user service and infrastructure, commit batch:"
-AI: Executes organized batch commits
-
-User: "All the workspace service files are ready, commit all:"
-AI: Creates single comprehensive commit
-
-User: "Just commit the domain layer changes commit domain:"
-AI: Commits only domain-related files
-
-User: "I need to create migration: add_user_permissions for dev environment"
-AI: Creates migration using proper script and naming
-
-User: "Let's build and test: everything before deployment"
-AI: Runs complete build and test suite
+### App Spec Generation
+```bash
+# Generate app spec from .env file
+./src/scripts/deploy.sh dev generate
+./src/scripts/deploy.sh staging generate
+./src/scripts/deploy.sh prod generate
 ```
 
-## Remember
-- **Always validate** command parameters before execution
-- **Use proper scoping** for commit messages
-- **Follow naming conventions** for migrations
+## Development Workflow
+
+### Quick Start
+```bash
+# 1. Setup environment
+./src/scripts/setup.sh dev
+
+# 2. Edit environment file
+nano .env.development
+
+# 3. Run migrations
+./src/scripts/migrate.sh up dev
+
+# 4. Deploy to development
+./src/scripts/deploy.sh dev create
+```
+
+### Daily Development
+```bash
+# Check migration status
+./src/scripts/migrate.sh status dev
+
+# Apply new migrations
+./src/scripts/migrate.sh up dev
+
+# Deploy changes
+./src/scripts/deploy.sh dev deploy
+
+# Check deployment status
+./src/scripts/deploy.sh dev status
+```
+
+### Testing Changes
+```bash
+# Validate migrations before committing
+./src/scripts/migrate.sh validate
+
+# Test specific migration
+./src/scripts/migrate.sh test migration_name dev
+
+# Generate app spec to test config
+./src/scripts/deploy.sh dev generate
+```
+
+## Troubleshooting
+
+### Common Issues
+```bash
+# Check prerequisites
+./src/scripts/setup.sh dev
+
+# Validate configuration
+./src/scripts/deploy.sh dev generate
+
+# Check migration status
+./src/scripts/migrate.sh status dev
+
+# View deployment logs
+./src/scripts/deploy.sh dev logs
+```
+
+### Debug Mode
+```bash
+# Enable debug output
+export DEBUG=true
+
+# Run commands with debug info
+./src/scripts/setup.sh dev
+./src/scripts/deploy.sh dev deploy
+./src/scripts/migrate.sh up dev
+```
+
+## Help and Documentation
+
+### Show Help
+```bash
+# Show setup help
+./src/scripts/setup.sh help
+
+# Show deployment help
+./src/scripts/deploy.sh help
+
+# Show migration help
+./src/scripts/migrate.sh help
+```
+
+### Environment Setup Instructions
+```bash
+# Show environment setup steps
+./src/scripts/setup.sh setup
+```
+
+## Quick Reference
+
+### Most Common Commands
+```bash
+# Development workflow
+./src/scripts/setup.sh dev                    # Setup dev environment
+./src/scripts/migrate.sh up dev               # Apply migrations
+./src/scripts/deploy.sh dev deploy            # Deploy to dev
+
+# Migration management
+./src/scripts/migrate.sh create name dev      # Create migration
+./src/scripts/migrate.sh validate             # Validate migrations
+./src/scripts/migrate.sh test name dev        # Test migration
+
+# Deployment
+./src/scripts/deploy.sh dev status            # Check status
+./src/scripts/deploy.sh dev logs              # View logs
+./src/scripts/deploy.sh dev generate          # Generate spec
+```
+
+### Environment-Specific
+```bash
+# Development
+./src/scripts/setup.sh dev
+./src/scripts/migrate.sh up dev
+./src/scripts/deploy.sh dev deploy
+
+# Staging
+./src/scripts/setup.sh staging
+./src/scripts/migrate.sh up staging
+./src/scripts/deploy.sh staging deploy
+
+# Production
+./src/scripts/setup.sh prod
+./src/scripts/migrate.sh up prod
+./src/scripts/deploy.sh prod deploy
+```
+
+## Notes
+
+- **Always use scripts**: Never create migrations manually or use tools directly
+- **Test in dev first**: Always test changes in development before staging/production
+- **Validate before commit**: Run validation commands before committing migrations
+- **Check status**: Use status commands to verify current state
+- **Debug mode**: Enable DEBUG=true for troubleshooting
 - **Test before commit** when possible
 - **Provide clear feedback** on command execution
 - **Stop on errors** and report issues clearly

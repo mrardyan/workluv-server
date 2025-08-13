@@ -17,7 +17,6 @@ This project implements a RESTful API server using:
 - Go 1.23 or higher
 - Docker and Docker Compose
 - PostgreSQL 15
-- Redis 7
 
 ### Running with Docker (Recommended)
 
@@ -35,7 +34,6 @@ This project implements a RESTful API server using:
 3. **Access the application**
    - API Server: http://localhost:8080
    - PostgreSQL: localhost:5432
-   - Redis: localhost:6379
    - pgAdmin: http://localhost:5050 (admin@example.com / admin)
 
 ### Running Locally
@@ -53,17 +51,13 @@ This project implements a RESTful API server using:
    export DATABASE_USER=postgres
    export DATABASE_PASSWORD=password
    export DATABASE_SSL_MODE=disable
-   export REDIS_HOST=localhost
-   export REDIS_PORT=6379
-   export REDIS_PASSWORD=
-   export REDIS_DB=0
    export SERVER_PORT=8080
    export LOG_LEVEL=debug
    ```
 
-3. **Start PostgreSQL and Redis**
+3. **Start PostgreSQL**
    ```bash
-   docker-compose up -d postgres redis
+   docker-compose up -d postgres
    ```
 
 4. **Build and run**
@@ -86,10 +80,6 @@ The application uses a centralized configuration system that reads from environm
 | `DATABASE_USER` | Database user | `postgres` |
 | `DATABASE_PASSWORD` | Database password | `password` |
 | `DATABASE_SSL_MODE` | SSL mode | `disable` |
-| `REDIS_HOST` | Redis host | `localhost` |
-| `REDIS_PORT` | Redis port | `6379` |
-| `REDIS_PASSWORD` | Redis password | `` (empty) |
-| `REDIS_DB` | Redis database number | `0` |
 | `SERVER_PORT` | HTTP server port | `8080` |
 | `LOG_LEVEL` | Logging level | `info` |
 
@@ -97,7 +87,6 @@ The application uses a centralized configuration system that reads from environm
 
 The configuration is organized into logical groups:
 - **Database**: PostgreSQL connection settings
-- **Redis**: Redis connection settings  
 - **Server**: HTTP server configuration
 - **Log**: Logging configuration
 
@@ -118,6 +107,12 @@ The configuration is organized into logical groups:
 
 ```
 go-server/
+├── src/
+│   ├── scripts/          # Deployment and utility scripts
+│   │   ├── deploy.sh     # DigitalOcean deployment script
+│   │   ├── setup.sh      # Environment setup script
+│   │   └── migrate.sh    # Database migration script
+│   └── email/            # Email templates
 ├── infrastructure/         # Infrastructure configuration
 │   ├── db.go             # Database connection
 │   ├── network.go         # HTTP client configuration and utilities
@@ -189,3 +184,25 @@ response, err = infrastructure.Post(ctx, httpClient, "https://api.example.com/cr
 - **Webhook notifications**: Sending HTTP requests to external systems
 - **File uploads**: HTTP client for file transfer services
 - **Email validation**: External email verification services
+
+## Deployment
+
+### Quick Deployment
+
+1. **Setup environment**
+   ```bash
+   ./src/scripts/setup.sh dev
+   ```
+
+2. **Deploy to DigitalOcean**
+   ```bash
+   ./src/scripts/deploy.sh dev create
+   ```
+
+### Available Scripts
+
+- **`./src/scripts/setup.sh`** - Environment setup and configuration
+- **`./src/scripts/deploy.sh`** - DigitalOcean App Platform deployment
+- **`./src/scripts/migrate.sh`** - Database migration management
+
+For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).

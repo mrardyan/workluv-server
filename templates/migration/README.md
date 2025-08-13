@@ -1,151 +1,295 @@
-# Database Migration Templates
+# Migration Template
 
-This directory contains templates and rules for database migrations using Goose with PostgreSQL.
-
-## Overview
-
-Migration templates ensure consistent structure and best practices across all database migrations in the project. These templates integrate with the automated validation system to maintain high quality and safety standards.
-
-## Template Files
-
-- `migration.template.sql` - Standard SQL migration template with proper structure and examples
-
-## Template Structure
-
-The migration template provides:
-
-### Required Sections
-- **Header Comments**: Business context, dependencies, and impact assessment
-- **UP Migration**: Forward changes with proper safety checks
-- **DOWN Migration**: Complete rollback procedures
-
-### Built-in Best Practices
-- **Idempotent Operations**: All operations use IF EXISTS/IF NOT EXISTS
-- **Foreign Key Constraints**: Proper referential integrity with CASCADE behavior
-- **Performance Indexes**: Indexes for foreign keys and frequently queried columns
-- **Safety Checks**: Transaction-safe operations with proper error handling
-
-### Documentation Standards
-- **Business Context**: Clear explanation of why the change is needed
-- **Dependencies**: List of prerequisite migrations or system changes
-- **Performance Impact**: Expected impact on database and application performance
-- **Rollback Notes**: Special considerations for the DOWN migration
+This template provides a standardized structure for creating new database migrations.
 
 ## Usage
 
-### Creating New Migrations
+### 1. Create New Migration
 
-Use the migration script to create new migrations from the template:
+Always use the migration script to create new migrations:
 
 ```bash
-# Create new migration with automatic template application
-./scripts/migrate.sh create add_user_roles dev
+./src/scripts/migrate.sh create migration_name dev
 ```
 
-The script will:
-1. Validate the migration name against naming conventions
-2. Generate a timestamped migration file
-3. Apply the template structure automatically
-4. Guide you to customize the template for your specific needs
+**Examples:**
+```bash
+./src/scripts/migrate.sh create add_user_roles dev
+./src/scripts/migrate.sh create create_audit_table dev
+./src/scripts/migrate.sh create update_workspace_permissions dev
+```
 
-### Template Customization
+### 2. Migration Naming Convention
 
-When using the template:
+- **Format**: `action_table_name` (snake_case)
+- **Action verbs**: `add`, `create`, `remove`, `drop`, `update`, `alter`, `fix`, `migrate`, `seed`
+- **Examples**:
+  - `add_user_roles` - Add new roles to users table
+  - `create_audit_table` - Create new audit logging table
+  - `update_workspace_permissions` - Modify workspace permission structure
 
-1. **Replace Placeholders**: Update `[MIGRATION_NAME]` and example content
-2. **Add Business Context**: Explain why this migration is needed
-3. **Document Dependencies**: List any prerequisite migrations
-4. **Assess Performance**: Note expected impact on database performance
-5. **Design Rollback**: Ensure DOWN migration safely reverses UP changes
+### 3. File Structure
 
-### Validation
+The script will create a file with the current timestamp:
 
-All migrations created from templates are automatically validated against project rules:
+```sql
+-- +goose Up
+-- +goose StatementBegin
+-- Your UP migration SQL here
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+-- Your DOWN migration SQL here
+-- +goose StatementEnd
+```
+
+## Migration Rules
+
+### 1. Always Use Scripts
+
+**✅ CORRECT:**
+```bash
+./src/scripts/migrate.sh create migration_name dev
+```
+
+**❌ INCORRECT:**
+- Creating files manually
+- Copying existing migrations
+- Renaming migration files
+
+### 2. Required Elements
+
+Every migration must include:
+
+1. **Goose Comments**: `-- +goose Up` and `-- +goose Down`
+2. **Up Migration**: Forward migration logic
+3. **Down Migration**: Rollback logic
+4. **Comments**: Explain what the migration does
+
+### 3. SQL Best Practices
+
+**✅ GOOD:**
+```sql
+-- Create users table with proper constraints
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    created_at BIGINT NOT NULL DEFAULT EXTRACT(epoch FROM NOW()),
+    updated_at BIGINT NOT NULL DEFAULT EXTRACT(epoch FROM NOW())
+);
+
+-- Add indexes for performance
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+```
+
+**❌ AVOID:**
+```sql
+-- Missing IF NOT EXISTS
+CREATE TABLE users (...);
+
+-- Missing indexes on foreign keys
+CREATE TABLE posts (
+    user_id INTEGER REFERENCES users(id)
+    -- Missing: CREATE INDEX idx_posts_user_id ON posts(user_id);
+);
+```
+
+### 4. Rollback Safety
+
+**✅ SAFE:**
+```sql
+-- +goose Down
+-- +goose StatementBegin
+DROP TABLE IF EXISTS users CASCADE;
+-- +goose StatementEnd
+```
+
+**❌ DANGEROUS:**
+```sql
+-- +goose Down
+-- +goose StatementBegin
+DROP TABLE users; -- No IF EXISTS, could fail
+-- +goose StatementEnd
+```
+
+## Validation
+
+### 1. Validate Before Committing
 
 ```bash
-# Validate specific migration
-./scripts/migrate.sh validate migration_name
-
 # Validate all migrations
-./scripts/migrate.sh validate
+./src/scripts/migrate.sh validate
 
-# Lint for common issues
-./scripts/migrate.sh lint
+# Validate specific migration
+./src/scripts/migrate.sh validate migration_name
 ```
 
-## Template Features
+### 2. Lint for Issues
 
-### Safety by Default
-- All table operations use IF EXISTS/IF NOT EXISTS
-- Foreign key constraints include proper CASCADE behavior
-- Indexes are created for performance optimization
-- Transactions ensure atomicity
-
-### Comprehensive Documentation
-- Clear section headers and organization
-- Business context and technical rationale
-- Dependencies and prerequisites
-- Performance impact assessment
-
-### Rollback Reliability
-- Complete reversal of UP migration changes
-- Proper order of operations (reverse of creation order)
-- Safety checks for all DROP operations
-
-## Best Practices
-
-### When Customizing Templates
-1. **Keep Safety First**: Never remove IF EXISTS/IF NOT EXISTS clauses
-2. **Document Thoroughly**: Explain the business need and technical approach
-3. **Test Rollbacks**: Ensure DOWN migration works correctly
-4. **Consider Performance**: Add appropriate indexes for query patterns
-
-### Common Patterns
-- **Adding Tables**: Use full template structure with constraints and indexes
-- **Adding Columns**: Include safe ALTER TABLE operations
-- **Data Migrations**: Separate from schema changes when possible
-- **Index Changes**: Always include performance impact assessment
-
-## Integration with Development Workflow
-
-### Pre-Commit Validation
-The template works with project validation rules to ensure:
-- Proper naming conventions
-- Required documentation sections
-- Safety and performance best practices
-- Complete rollback procedures
-
-### Cursor IDE Integration
-Template rules are integrated with Cursor IDE via `.cursor/05-migration-rules.mdc`, providing:
-- Automatic code generation assistance
-- Real-time validation feedback
-- Best practice recommendations
-- Anti-pattern detection
-
-## File Organization
-```
-templates/migration/
-├── README.md                # This documentation
-└── migration.template.sql   # Standard migration template
+```bash
+# Check for common problems
+./src/scripts/migrate.sh lint
 ```
 
-## Related Documentation
+### 3. Test Migrations
 
-- [Migration Rules](.cursor/05-migration-rules.mdc) - Cursor IDE integration
-- [Migration README](../migration/README.md) - Usage and commands
-- [Migration Rules](../migration/MIGRATION_RULES.md) - Detailed governance
-- [Setup Script](../scripts/setup.sh) - Environment configuration
+```bash
+# Test specific migration
+./src/scripts/migrate.sh test migration_name dev
+```
 
-## Security Considerations
+## Common Patterns
 
-### Template Safety
-- Never include hardcoded secrets or passwords
-- Use environment variables for configuration
-- Follow principle of least privilege
-- Include proper constraint validation
+### 1. Adding Columns
 
-### Production Readiness
-- All templates are production-ready by default
-- Safety checks prevent accidental data loss
-- Performance considerations are built-in
-- Rollback procedures are thoroughly tested
+```sql
+-- +goose Up
+-- +goose StatementBegin
+ALTER TABLE users 
+ADD COLUMN IF NOT EXISTS phone VARCHAR(20),
+ADD COLUMN IF NOT EXISTS verified_at BIGINT;
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+ALTER TABLE users 
+DROP COLUMN IF EXISTS phone,
+DROP COLUMN IF EXISTS verified_at;
+-- +goose StatementEnd
+```
+
+### 2. Creating Tables
+
+```sql
+-- +goose Up
+-- +goose StatementBegin
+CREATE TABLE IF NOT EXISTS user_profiles (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    bio TEXT,
+    avatar_url VARCHAR(500),
+    created_at BIGINT NOT NULL DEFAULT EXTRACT(epoch FROM NOW()),
+    updated_at BIGINT NOT NULL DEFAULT EXTRACT(epoch FROM NOW())
+);
+
+-- Add indexes
+CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id ON user_profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_profiles_created_at ON user_profiles(created_at);
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+DROP TABLE IF EXISTS user_profiles CASCADE;
+-- +goose StatementEnd
+```
+
+### 3. Adding Constraints
+
+```sql
+-- +goose Up
+-- +goose StatementBegin
+-- Add unique constraint
+ALTER TABLE users 
+ADD CONSTRAINT IF NOT EXISTS uk_users_email UNIQUE (email);
+
+-- Add check constraint
+ALTER TABLE users 
+ADD CONSTRAINT IF NOT EXISTS chk_users_age 
+CHECK (age >= 13 AND age <= 120);
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+-- Remove constraints
+ALTER TABLE users DROP CONSTRAINT IF EXISTS uk_users_email;
+ALTER TABLE users DROP CONSTRAINT IF EXISTS chk_users_age;
+-- +goose StatementEnd
+```
+
+## Troubleshooting
+
+### 1. Migration Fails
+
+**Check:**
+- SQL syntax errors
+- Missing dependencies
+- Database connection
+- Environment variables
+
+**Debug:**
+```bash
+# Check migration status
+./src/scripts/migrate.sh status dev
+
+# View database logs
+docker-compose logs postgres
+```
+
+### 2. Rollback Issues
+
+**Common causes:**
+- Missing `IF EXISTS` clauses
+- Data dependencies
+- Constraint violations
+
+**Solution:**
+- Always use `IF EXISTS` for drops
+- Test rollbacks in development
+- Handle data migration carefully
+
+### 3. Version Conflicts
+
+**Symptoms:**
+- Migration version mismatch
+- Applied migrations not in sync
+
+**Solution:**
+```bash
+# Check current version
+./src/scripts/migrate.sh version dev
+
+# Reset if needed (development only)
+./src/scripts/migrate.sh reset dev
+```
+
+## Environment Setup
+
+### 1. Development
+
+```bash
+# Setup environment
+./src/scripts/setup.sh dev
+
+# Edit .env.development with database details
+nano .env.development
+
+# Test connection
+./src/scripts/migrate.sh status dev
+```
+
+### 2. Staging/Production
+
+```bash
+# Setup environment
+./src/scripts/setup.sh staging
+./src/scripts/setup.sh prod
+
+# Configure database credentials
+nano .env.staging
+nano .env.production
+```
+
+## Related Scripts
+
+- [Setup Script](../src/scripts/setup.sh) - Environment configuration
+- [Deploy Script](../src/scripts/deploy.sh) - Production deployment
+- [Migration Script](../src/scripts/migrate.sh) - Migration management
+
+## Additional Resources
+
+- [Goose Documentation](https://github.com/pressly/goose)
+- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
+- [Migration Rules](../../.cursor/05-migration-rules.mdc)
