@@ -2,8 +2,8 @@ package session
 
 import (
 	"database/sql"
-	delivery "go-server/internal/service/session/delivery"
-	"go-server/pkg/config"
+	delivery "workluv/internal/service/session/delivery"
+	"workluv/pkg/config"
 
 	"github.com/gin-gonic/gin"
 )

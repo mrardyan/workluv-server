@@ -1,6 +1,6 @@
-name: go-server-staging
+name: workluv-staging
 services:
-  - name: go-server
+  - name: workluv
     source_dir: /
     github:
       repo: YOUR_GITHUB_USERNAME/YOUR_REPO_NAME
@@ -21,14 +21,14 @@ databases:
     engine: PG
     version: "15"
     production: false
-    cluster_name: go-server-staging-cluster
+    cluster_name: workluv-staging-cluster
     db_name: golang_arch_staging
     db_user: golang_arch
 
 domains:
-  - domain: api.staging.go-server.app
+  - domain: api.staging.workluv.app
     type: PRIMARY
-    zone: staging.go-server.app
+    zone: staging.workluv.app
 
 alerts:
   - rule: DEPLOYMENT_FAILED
@@ -40,7 +40,7 @@ features:
 ingress:
   rules:
     - component:
-        name: go-server
+        name: workluv
       match:
         path:
           prefix: /

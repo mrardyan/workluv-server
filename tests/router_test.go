@@ -10,14 +10,14 @@ import (
 	"testing"
 	"time"
 
-	"go-server/internal"
-	"go-server/internal/infrastructure"
-	"go-server/internal/service/account"
-	accountDelivery "go-server/internal/service/account/delivery"
-	"go-server/internal/service/workspace"
-	workspaceDelivery "go-server/internal/service/workspace/delivery"
-	"go-server/pkg/config"
-	"go-server/pkg/logger"
+	"workluv/internal"
+	"workluv/internal/infrastructure"
+	"workluv/internal/service/account"
+	accountDelivery "workluv/internal/service/account/delivery"
+	"workluv/internal/service/workspace"
+	workspaceDelivery "workluv/internal/service/workspace/delivery"
+	"workluv/pkg/config"
+	"workluv/pkg/logger"
 
 	"github.com/gin-gonic/gin"
 )

@@ -1,8 +1,8 @@
 package infrastructure
 
 import (
-	"go-server/pkg/config"
 	"time"
+	"workluv/pkg/config"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"

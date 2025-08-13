@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"go-server/pkg/config"
+	"workluv/pkg/config"
 
 	"github.com/redis/go-redis/v9"
 )

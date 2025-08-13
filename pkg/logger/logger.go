@@ -1,9 +1,9 @@
 package logger
 
 import (
-	"go-server/pkg/config"
 	"log"
 	"os"
+	"workluv/pkg/config"
 )
 
 // SetupLogger configures the logger based on the configuration

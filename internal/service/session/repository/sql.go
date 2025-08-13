@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"go-server/internal/service/session/domain"
-	"go-server/internal/shared"
+	"workluv/internal/service/session/domain"
+	"workluv/internal/shared"
 
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"

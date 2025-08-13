@@ -8,8 +8,8 @@ import (
 	"os"
 	"strconv"
 
-	"go-server/pkg/config"
-	"go-server/pkg/logger"
+	"workluv/pkg/config"
+	"workluv/pkg/logger"
 
 	_ "github.com/jackc/pgx/v5/stdlib" // PostgreSQL driver
 	"github.com/pressly/goose/v3"

@@ -2,9 +2,9 @@ package jwt
 
 import (
 	"errors"
-	"go-server/internal/shared"
-	"go-server/pkg/config"
 	"time"
+	"workluv/internal/shared"
+	"workluv/pkg/config"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"

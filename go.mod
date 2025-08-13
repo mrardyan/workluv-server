@@ -1,4 +1,4 @@
-module go-server
+module workluv
 
 go 1.23.4
 

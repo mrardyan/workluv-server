@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	accountdomain "go-server/internal/service/account/domain"
 	"time"
+	accountdomain "workluv/internal/service/account/domain"
 
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"

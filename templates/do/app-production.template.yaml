@@ -1,6 +1,6 @@
-name: go-server-prod
+name: workluv-prod
 services:
-  - name: go-server
+  - name: workluv
     source_dir: /
     github:
       repo: YOUR_GITHUB_USERNAME/YOUR_REPO_NAME
@@ -21,14 +21,14 @@ databases:
     engine: PG
     version: "15"
     production: true
-    cluster_name: go-server-prod-cluster
+    cluster_name: workluv-prod-cluster
     db_name: golang_arch_prod
     db_user: golang_arch
 
 domains:
-  - domain: api.go-server.app
+  - domain: api.workluv.app
     type: PRIMARY
-    zone: go-server.app
+    zone: workluv.app
 
 alerts:
   - rule: DEPLOYMENT_FAILED
@@ -40,7 +40,7 @@ features:
 ingress:
   rules:
     - component:
-        name: go-server
+        name: workluv
       match:
         path:
           prefix: /

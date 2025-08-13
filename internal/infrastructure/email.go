@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"go-server/pkg/config"
+	"workluv/pkg/config"
 )
 
 // EmailService represents the email service interface

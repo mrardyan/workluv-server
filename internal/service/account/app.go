@@ -2,10 +2,10 @@ package account
 
 import (
 	"database/sql"
-	"go-server/internal/infrastructure"
-	delivery "go-server/internal/service/account/delivery"
-	"go-server/pkg/config"
 	"net/http"
+	"workluv/internal/infrastructure"
+	delivery "workluv/internal/service/account/delivery"
+	"workluv/pkg/config"
 
 	"github.com/gin-gonic/gin"
 )

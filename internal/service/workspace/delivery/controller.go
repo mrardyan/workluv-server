@@ -2,10 +2,10 @@ package delivery
 
 import (
 	"database/sql"
-	"go-server/internal/service/workspace/domain"
-	"go-server/internal/service/workspace/repository"
 	"net/http"
 	"strconv"
+	"workluv/internal/service/workspace/domain"
+	"workluv/internal/service/workspace/repository"
 
 	"github.com/gin-gonic/gin"
 )

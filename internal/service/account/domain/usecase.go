@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"go-server/internal/infrastructure"
-	"go-server/pkg/config"
+	"workluv/internal/infrastructure"
+	"workluv/pkg/config"
 
 	"github.com/google/uuid"
 )

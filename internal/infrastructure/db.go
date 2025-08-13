@@ -2,7 +2,7 @@ package infrastructure
 
 import (
 	"database/sql"
-	"go-server/pkg/config"
+	"workluv/pkg/config"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )

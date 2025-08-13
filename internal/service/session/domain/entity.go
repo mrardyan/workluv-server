@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"go-server/internal/shared"
+	"workluv/internal/shared"
 
 	"github.com/google/uuid"
 )

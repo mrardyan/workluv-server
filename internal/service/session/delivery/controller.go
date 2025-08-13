@@ -2,14 +2,14 @@ package delivery
 
 import (
 	"database/sql"
-	accountDomain "go-server/internal/service/account/domain"
-	accountRepo "go-server/internal/service/account/repository"
-	"go-server/internal/service/session/domain"
-	"go-server/internal/service/session/dto"
-	"go-server/internal/service/session/repository"
-	"go-server/pkg/config"
-	"go-server/pkg/jwt"
 	"net/http"
+	accountDomain "workluv/internal/service/account/domain"
+	accountRepo "workluv/internal/service/account/repository"
+	"workluv/internal/service/session/domain"
+	"workluv/internal/service/session/dto"
+	"workluv/internal/service/session/repository"
+	"workluv/pkg/config"
+	"workluv/pkg/jwt"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

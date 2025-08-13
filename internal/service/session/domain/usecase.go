@@ -3,9 +3,9 @@ package domain
 import (
 	"context"
 	"errors"
-	accountDomain "go-server/internal/service/account/domain"
-	"go-server/internal/shared"
-	"go-server/pkg/jwt"
+	accountDomain "workluv/internal/service/account/domain"
+	"workluv/internal/shared"
+	"workluv/pkg/jwt"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"

@@ -2,8 +2,8 @@ package workspace
 
 import (
 	"database/sql"
-	delivery "go-server/internal/service/workspace/delivery"
 	"net/http"
+	delivery "workluv/internal/service/workspace/delivery"
 
 	"github.com/gin-gonic/gin"
 )

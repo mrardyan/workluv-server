@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"go-server/internal/service/workspace/domain"
+	"workluv/internal/service/workspace/domain"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
