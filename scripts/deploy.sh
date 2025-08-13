@@ -248,15 +248,11 @@ generate_app_spec() {
         echo "    envs:" > "$temp_envs_file"
         cat "$temp_env_file" >> "$temp_envs_file"
         
-        # Use sed to replace the envs section in the template
-        # This will replace from "envs:" to the next non-indented line
-        sed '/^    envs:/,/^[^ ]/ {
-            /^    envs:/ {
-                r '"$temp_envs_file"'
-                d
-            }
-            /^[^ ]/ !d
-        }' "$template_file" > "$new_spec_file"
+        # Use a simpler approach to replace the envs section
+        # First, remove the existing envs section
+        sed '/^    envs:/,/^[^ ]/d' "$template_file" > "$new_spec_file"
+        # Then append our new envs section at the end
+        cat "$temp_envs_file" >> "$new_spec_file"
         
         # Replace the original file
         mv "$new_spec_file" "$spec_file"
