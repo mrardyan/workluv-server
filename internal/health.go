@@ -2,12 +2,12 @@ package internal
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
-	"gorm.io/gorm"
 )
 
 // HealthResponse represents the health check response
@@ -18,7 +18,7 @@ type HealthResponse struct {
 }
 
 // RegisterHealthRoutes registers health check endpoints
-func RegisterHealthRoutes(router *gin.Engine, db *gorm.DB, redisClient *redis.Client) {
+func RegisterHealthRoutes(router *gin.Engine, db *sql.DB, redisClient *redis.Client) {
 	router.GET("/health", func(c *gin.Context) {
 		health := HealthResponse{
 			Status:    "healthy",
@@ -56,16 +56,11 @@ func RegisterHealthRoutes(router *gin.Engine, db *gorm.DB, redisClient *redis.Cl
 	})
 }
 
-func checkDatabaseHealth(db *gorm.DB) error {
-	sqlDB, err := db.DB()
-	if err != nil {
-		return err
-	}
-
+func checkDatabaseHealth(db *sql.DB) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	return sqlDB.PingContext(ctx)
+	return db.PingContext(ctx)
 }
 
 func checkRedisHealth(redisClient *redis.Client) error {
