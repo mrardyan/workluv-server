@@ -1,10 +1,10 @@
-name: go-server-dev
+name: workluv-dev
 services:
-  - name: go-server
+  - name: workluv
     source_dir: /
     github:
-      repo: YOUR_GITHUB_USERNAME/YOUR_REPO_NAME
-      branch: main
+      repo: heymasthead/workluv-server
+      branch: develop
       deploy_on_push: true
     dockerfile_path: /Dockerfile
     http_port: 8080
@@ -20,10 +20,10 @@ databases:
   - name: db
     engine: PG
     version: "15"
-    production: false
-    cluster_name: go-server-dev-cluster
-    db_name: golang_arch_dev
-    db_user: golang_arch
+    production: true
+    cluster_name: app-138c05d6-83b3-41a1-b7ca-5e7de4ee2272
+    db_name: db
+    db_user: db
 
 domains:
   - domain: api.dev.go-server.app
@@ -40,7 +40,7 @@ features:
 ingress:
   rules:
     - component:
-        name: go-server
+        name: workluv
       match:
         path:
           prefix: /
