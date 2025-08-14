@@ -1,0 +1,94 @@
+// Use DBML to define your database structure
+// Docs: https://dbml.dbdiagram.io/docs
+// 
+// Database schema for Go Server application
+// Generated from migration files
+
+Table accounts {
+  id UUID [primary key, note: 'Primary key for accounts']
+  email VARCHAR(255) [unique, not null, note: 'User email address']
+  password_hash VARCHAR(255) [not null, note: 'Hashed user password']
+  full_name VARCHAR(200) [note: 'User full name']
+  is_active BOOLEAN [default: true, note: 'Account active status']
+  email_verified BOOLEAN [default: false, note: 'Email verification status']
+  created_at BIGINT [not null, default: `EXTRACT(epoch FROM NOW())`, note: 'Creation timestamp in epoch seconds']
+  updated_at BIGINT [not null, default: `EXTRACT(epoch FROM NOW())`, note: 'Last update timestamp in epoch seconds']
+  
+  indexes {
+    (email)
+    (is_active)
+    (created_at)
+    (updated_at)
+  }
+}
+
+Table workspaces {
+  id UUID [primary key, note: 'Primary key for workspaces']
+  name VARCHAR(255) [not null, note: 'Workspace name']
+  description TEXT [note: 'Workspace description']
+  owner_id UUID [not null, note: 'Owner account ID']
+  is_active BOOLEAN [default: true, note: 'Workspace active status']
+  created_at BIGINT [not null, default: `EXTRACT(epoch FROM NOW())`, note: 'Creation timestamp in epoch seconds']
+  updated_at BIGINT [not null, default: `EXTRACT(epoch FROM NOW())`, note: 'Last update timestamp in epoch seconds']
+  
+  indexes {
+    (owner_id)
+    (is_active)
+    (created_at)
+    (updated_at)
+  }
+}
+
+Table sessions {
+  id UUID [primary key, note: 'Primary key for sessions']
+  account_id UUID [not null, note: 'Associated account ID']
+  refresh_token VARCHAR(255) [unique, not null, note: 'Refresh token for authentication']
+  expires_at BIGINT [not null, note: 'Expiration timestamp in epoch seconds']
+  revoked_at BIGINT [note: 'Revocation timestamp in epoch seconds, null = active']
+  created_at BIGINT [not null, default: `EXTRACT(epoch FROM NOW())`, note: 'Creation timestamp in epoch seconds']
+  updated_at BIGINT [not null, default: `EXTRACT(epoch FROM NOW())`, note: 'Last update timestamp in epoch seconds']
+  
+  indexes {
+    (account_id)
+    (refresh_token)
+    (account_id) [name: 'idx_sessions_active', note: 'Partial index for active sessions']
+    (expires_at)
+    (created_at)
+    (updated_at)
+  }
+}
+
+Table verifications {
+  id UUID [primary key, note: 'Primary key for verifications']
+  account_id UUID [not null, note: 'Associated account ID']
+  type VARCHAR(50) [not null, note: 'Verification type (email, password_reset, etc.)']
+  status VARCHAR(20) [not null, default: 'pending', note: 'Verification status']
+  token VARCHAR(64) [unique, not null, note: 'Verification token']
+  expires_at BIGINT [not null, note: 'Expiration timestamp in epoch seconds']
+  completed_at BIGINT [note: 'Completion timestamp in epoch seconds, null = not completed']
+  created_at BIGINT [not null, default: `EXTRACT(epoch FROM NOW())`, note: 'Creation timestamp in epoch seconds']
+  updated_at BIGINT [not null, default: `EXTRACT(epoch FROM NOW())`, note: 'Last update timestamp in epoch seconds']
+  
+  indexes {
+    (token)
+    (account_id)
+    (type)
+    (status)
+    (expires_at)
+    (completed_at)
+    (created_at)
+    (updated_at)
+  }
+}
+
+// Relationships
+Ref: workspaces.owner_id > accounts.id [delete: cascade]
+Ref: sessions.account_id > accounts.id [delete: cascade]
+Ref: verifications.account_id > accounts.id [delete: cascade]
+
+// Notes about the schema:
+// - All timestamp fields use BIGINT to store epoch seconds (Unix timestamp)
+// - UUIDs are used for primary keys for better distribution and security
+// - Foreign key relationships include CASCADE delete for referential integrity
+// - Indexes are created for performance on frequently queried fields
+// - Triggers automatically update the updated_at field on record modifications
