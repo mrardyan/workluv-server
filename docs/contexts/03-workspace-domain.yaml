@@ -1,0 +1,1918 @@
+# =============================================================================
+# Workspace Domain: Complete Service Specification
+#   - Building Blocks: Entities, Value Objects, and Aggregates
+#   - Use Cases and Events (with DB mapping, required, and relationships)
+#   - Bounded Contexts and Domain Boundaries
+# =============================================================================
+
+# =============================================================================
+# 1. VALUE OBJECTS (Shared across all bounded contexts)
+# =============================================================================
+value_objects:
+  UUID:
+    description: "Universally unique identifier for entities."
+    priority: "high"
+    attributes:
+      - name: "value"
+        type: "string"
+        db_primitive: "uuid"
+        required: true
+    invariants:
+      - "Must be a valid UUID v4 format"
+      - "Must be globally unique"
+    methods:
+      - name: "generate"
+        description: "Generates a new UUID v4"
+        return_type: "UUID"
+      - name: "is_valid"
+        description: "Validates UUID format"
+        return_type: "boolean"
+        
+  Time:
+    description: "Epoch time used globally"
+    priority: "high"
+    attributes:
+      - name: "value"
+        type: "integer"
+        db_primitive: "number"
+        required: true
+        example: 1700000000
+    invariants:
+      - "Must be valid epoch time (non-negative integer)"
+      - "Represents seconds since Unix epoch (1970-01-01T00:00:00Z)"
+    methods:
+      - name: "to_datetime"
+        description: "Converts epoch time to human-readable datetime in UTC"
+        return_type: "datetime"
+      - name: "from_datetime"
+        description: "Creates a Time object from a datetime value"
+        parameters:
+          - name: "datetime"
+            type: "datetime"
+        return_type: "Time"
+
+  WorkspaceName:
+    description: "Name of a workspace, validated and normalized."
+    priority: "high"
+    attributes:
+      - name: "value"
+        type: "string"
+        db_primitive: "varchar(100)"
+        required: true
+    invariants:
+      - "Must be 3-100 characters long"
+      - "Must contain only alphanumeric characters, spaces, hyphens, and underscores"
+      - "Must be unique within the same owner's workspaces"
+    methods:
+      - name: "normalize"
+        description: "Trims whitespace and normalizes the name"
+        return_type: "WorkspaceName"
+      - name: "is_valid"
+        description: "Checks if the name meets all requirements"
+        return_type: "boolean"
+      - name: "generate_slug"
+        description: "Generates a URL-friendly slug from the name"
+        return_type: "string"
+
+  WorkspaceSlug:
+    description: "URL-friendly identifier for a workspace."
+    priority: "high"
+    attributes:
+      - name: "value"
+        type: "string"
+        db_primitive: "varchar(100)"
+        required: true
+    invariants:
+      - "Must be 3-100 characters long"
+      - "Must contain only lowercase alphanumeric characters and hyphens"
+      - "Must be globally unique across all workspaces"
+      - "Must not start or end with hyphens"
+    methods:
+      - name: "is_valid"
+        description: "Checks if the slug meets all requirements"
+        return_type: "boolean"
+      - name: "from_name"
+        description: "Creates a slug from a workspace name"
+        parameters:
+          - name: "name"
+            type: "string"
+        return_type: "WorkspaceSlug"
+
+  AccessLevel:
+    description: "Defines the level of access a member has in a workspace."
+    priority: "high"
+    attributes:
+      - name: "value"
+        type: "string"
+        db_primitive: "enum('OWNER','ADMIN','MEMBER','GUEST')"
+        required: true
+    invariants:
+      - "Must be one of the allowed enum values"
+      - "OWNER has highest privileges, GUEST has lowest"
+    methods:
+      - name: "can_manage_members"
+        description: "Checks if this access level can manage other members"
+        return_type: "boolean"
+      - name: "can_edit_workspace"
+        description: "Checks if this access level can edit workspace settings"
+        return_type: "boolean"
+      - name: "can_view_workspace"
+        description: "Checks if this access level can view workspace content"
+        return_type: "boolean"
+
+# =============================================================================
+# 2. BOUNDED CONTEXTS
+# =============================================================================
+bounded_contexts:
+  workspace_management:
+    description: "Handles workspace creation, configuration, and basic management"
+    domain: "Workspace"
+    priority: "high"
+    responsibilities:
+      - "Workspace creation and deletion"
+      - "Basic workspace configuration"
+      - "Workspace metadata management"
+      - "Workspace lifecycle management"
+    external_dependencies:
+      - "user-service: for owner and member validation"
+      - "notification-service: for workspace updates"
+      - "audit-service: for workspace changes"
+    
+    # Entities within this bounded context
+    entities:
+      Workspace:
+        description: "Represents a collaborative workspace with members and configuration."
+        priority: "high"
+        attributes:
+          - name: "id"
+            type: "UUID"
+            db_primitive: "uuid"
+            required: true
+          - name: "name"
+            type: "WorkspaceName"
+            value_object: "WorkspaceName"
+            db_primitive: "varchar(100)"
+            required: true
+          - name: "slug"
+            type: "WorkspaceSlug"
+            value_object: "WorkspaceSlug"
+            db_primitive: "varchar(100)"
+            required: true
+          - name: "description"
+            type: "string"
+            db_primitive: "text"
+            required: false
+          - name: "owner_id"
+            type: "UUID"
+            db_primitive: "uuid"
+            required: true
+            relationship:
+              type: "many-to-one"
+              target: "Account.id"
+          - name: "status"
+            type: "enum: [ACTIVE, ARCHIVED, DELETED]"
+            db_primitive: "enum('ACTIVE','ARCHIVED','DELETED')"
+            required: true
+            default: "ACTIVE"
+          - name: "visibility"
+            type: "enum: [PUBLIC, PRIVATE, RESTRICTED]"
+            db_primitive: "enum('PUBLIC','PRIVATE','RESTRICTED')"
+            required: true
+            default: "PRIVATE"
+          - name: "created_at"
+            type: "Time"
+            db_primitive: "number"
+            required: true
+          - name: "updated_at"
+            type: "Time"
+            db_primitive: "number"
+            required: true
+          - name: "deleted_at"
+            type: "Time"
+            db_primitive: "number"
+            required: false
+        invariants:
+          - "Workspace name must be unique within the same owner's workspaces"
+          - "Workspace slug must be globally unique"
+          - "Owner must be a valid user account"
+          - "Status must always be one of the allowed enum values"
+          - "Visibility must always be one of the allowed enum values"
+
+      WorkspaceConfig:
+        description: "Configuration settings for a workspace."
+        priority: "normal"
+        attributes:
+          - name: "id"
+            type: "UUID"
+            db_primitive: "uuid"
+            required: true
+          - name: "workspace_id"
+            type: "UUID"
+            db_primitive: "uuid"
+            required: true
+            relationship:
+              type: "one-to-one"
+              target: "Workspace.id"
+          - name: "allow_public_access"
+            type: "boolean"
+            db_primitive: "boolean"
+            required: true
+            default: false
+          - name: "require_approval_for_join"
+            type: "boolean"
+            db_primitive: "boolean"
+            required: true
+            default: true
+          - name: "max_members"
+            type: "integer"
+            db_primitive: "integer"
+            required: true
+            default: 100
+          - name: "default_access_level"
+            type: "AccessLevel"
+            value_object: "AccessLevel"
+            db_primitive: "enum('OWNER','ADMIN','MEMBER','GUEST')"
+            required: true
+            default: "MEMBER"
+          - name: "created_at"
+            type: "Time"
+            db_primitive: "number"
+            required: true
+          - name: "updated_at"
+            type: "Time"
+            db_primitive: "number"
+            required: true
+        invariants:
+          - "Max members must be positive and reasonable (1-1000)"
+          - "Default access level must be valid"
+          - "WorkspaceConfig must always exist for a Workspace"
+
+      WorkspaceMember:
+        description: "Represents a user's membership in a workspace with specific access level."
+        priority: "high"
+        attributes:
+          - name: "id"
+            type: "UUID"
+            db_primitive: "uuid"
+            required: true
+          - name: "workspace_id"
+            type: "UUID"
+            db_primitive: "uuid"
+            required: true
+            relationship:
+              type: "many-to-one"
+              target: "Workspace.id"
+          - name: "account_id"
+            type: "UUID"
+            db_primitive: "uuid"
+            required: true
+            relationship:
+              type: "many-to-one"
+              target: "Account.id"
+          - name: "access_level"
+            type: "AccessLevel"
+            value_object: "AccessLevel"
+            db_primitive: "enum('OWNER','ADMIN','MEMBER','GUEST')"
+            required: true
+          - name: "joined_at"
+            type: "Time"
+            db_primitive: "number"
+            required: true
+          - name: "invited_by"
+            type: "UUID"
+            db_primitive: "uuid"
+            required: false
+            relationship:
+              type: "many-to-one"
+              target: "Account.id"
+          - name: "status"
+            type: "enum: [ACTIVE, PENDING, SUSPENDED]"
+            db_primitive: "enum('ACTIVE','PENDING','SUSPENDED')"
+            required: true
+            default: "ACTIVE"
+          - name: "last_activity_at"
+            type: "Time"
+            db_primitive: "number"
+            required: false
+        invariants:
+          - "Workspace member must be associated with valid workspace and account"
+          - "Access level must be valid"
+          - "Status must always be one of the allowed enum values"
+          - "Owner must always have OWNER access level"
+          - "Member status must be valid"
+
+      WorkspaceInvitation:
+        description: "Invitation for a user to join a workspace."
+        priority: "normal"
+        attributes:
+          - name: "id"
+            type: "UUID"
+            db_primitive: "uuid"
+            required: true
+          - name: "workspace_id"
+            type: "UUID"
+            db_primitive: "uuid"
+            required: true
+            relationship:
+              type: "many-to-one"
+              target: "Workspace.id"
+          - name: "invited_email"
+            type: "string"
+            db_primitive: "varchar(255)"
+            required: true
+          - name: "invited_by"
+            type: "UUID"
+            db_primitive: "uuid"
+            required: true
+            relationship:
+              type: "many-to-one"
+              target: "Account.id"
+          - name: "access_level"
+            type: "AccessLevel"
+            value_object: "AccessLevel"
+            db_primitive: "enum('OWNER','ADMIN','MEMBER','GUEST')"
+            required: true
+            default: "MEMBER"
+          - name: "token"
+            type: "string"
+            db_primitive: "varchar(255)"
+            required: true
+          - name: "expires_at"
+            type: "Time"
+            db_primitive: "number"
+            required: true
+          - name: "status"
+            type: "enum: [PENDING, ACCEPTED, DECLINED, EXPIRED]"
+            db_primitive: "enum('PENDING','ACCEPTED','DECLINED','EXPIRED')"
+            required: true
+            default: "PENDING"
+          - name: "created_at"
+            type: "Time"
+            db_primitive: "number"
+            required: true
+          - name: "accepted_at"
+            type: "Time"
+            db_primitive: "number"
+            required: false
+        invariants:
+          - "Invitation must be associated with valid workspace"
+          - "Token must be unique and secure"
+          - "Expiration date must be in the future at creation time"
+          - "Status must always be one of the allowed enum values"
+          - "Access level cannot be OWNER for invitations"
+
+    # Repository layer within this bounded context
+    repositories:
+      WorkspaceRepository:
+        description: "Data access layer for Workspace entity operations"
+        priority: "high"
+        interface_methods:
+          - name: "Create"
+            description: "Creates a new workspace"
+            parameters:
+              - name: "workspace"
+                type: "Workspace"
+            return_type: "Workspace"
+            error_handling: "Returns error if name/slug already exists or owner invalid"
+          - name: "GetByID"
+            description: "Retrieves workspace by ID"
+            parameters:
+              - name: "id"
+                type: "UUID"
+            return_type: "Workspace"
+            error_handling: "Returns error if workspace not found"
+          - name: "GetBySlug"
+            description: "Retrieves workspace by slug"
+            parameters:
+              - name: "slug"
+                type: "string"
+            return_type: "Workspace"
+            error_handling: "Returns error if workspace not found"
+          - name: "GetByOwnerID"
+            description: "Retrieves all workspaces owned by a user"
+            parameters:
+              - name: "owner_id"
+                type: "UUID"
+            return_type: "[]Workspace"
+            error_handling: "Returns empty slice if none found"
+          - name: "Update"
+            description: "Updates existing workspace"
+            parameters:
+              - name: "workspace"
+                type: "Workspace"
+            return_type: "Workspace"
+            error_handling: "Returns error if update fails"
+          - name: "Delete"
+            description: "Soft deletes workspace"
+            parameters:
+              - name: "id"
+                type: "UUID"
+            return_type: "error"
+            error_handling: "Returns error if deletion fails"
+          - name: "Exists"
+            description: "Checks if workspace exists by slug"
+            parameters:
+              - name: "slug"
+                type: "string"
+            return_type: "boolean"
+            error_handling: "Returns false if not found"
+
+      WorkspaceConfigRepository:
+        description: "Data access layer for WorkspaceConfig entity operations"
+        priority: "normal"
+        interface_methods:
+          - name: "Create"
+            description: "Creates new workspace configuration"
+            parameters:
+              - name: "config"
+                type: "WorkspaceConfig"
+            return_type: "WorkspaceConfig"
+            error_handling: "Returns error if creation fails"
+          - name: "GetByWorkspaceID"
+            description: "Retrieves configuration by workspace ID"
+            parameters:
+              - name: "workspace_id"
+                type: "UUID"
+            return_type: "WorkspaceConfig"
+            error_handling: "Returns error if not found"
+          - name: "Update"
+            description: "Updates existing configuration"
+            parameters:
+              - name: "config"
+                type: "WorkspaceConfig"
+            return_type: "WorkspaceConfig"
+            error_handling: "Returns error if update fails"
+
+      WorkspaceMemberRepository:
+        description: "Data access layer for WorkspaceMember entity operations"
+        priority: "high"
+        interface_methods:
+          - name: "Create"
+            description: "Creates new workspace member"
+            parameters:
+              - name: "member"
+                type: "WorkspaceMember"
+            return_type: "WorkspaceMember"
+            error_handling: "Returns error if member already exists"
+          - name: "GetByID"
+            description: "Retrieves member by ID"
+            parameters:
+              - name: "id"
+                type: "UUID"
+            return_type: "WorkspaceMember"
+            error_handling: "Returns error if not found"
+          - name: "GetByWorkspaceID"
+            description: "Retrieves all members of a workspace"
+            parameters:
+              - name: "workspace_id"
+                type: "UUID"
+            return_type: "[]WorkspaceMember"
+            error_handling: "Returns empty slice if none found"
+          - name: "GetByAccountID"
+            description: "Retrieves all workspaces a user is member of"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+            return_type: "[]WorkspaceMember"
+            error_handling: "Returns empty slice if none found"
+          - name: "UpdateAccessLevel"
+            description: "Updates member access level"
+            parameters:
+              - name: "id"
+                type: "UUID"
+              - name: "access_level"
+                type: "AccessLevel"
+            return_type: "error"
+            error_handling: "Returns error if update fails"
+          - name: "Remove"
+            description: "Removes member from workspace"
+            parameters:
+              - name: "id"
+                type: "UUID"
+            return_type: "error"
+            error_handling: "Returns error if removal fails"
+          - name: "Exists"
+            description: "Checks if user is member of workspace"
+            parameters:
+              - name: "workspace_id"
+                type: "UUID"
+              - name: "account_id"
+                type: "UUID"
+            return_type: "boolean"
+            error_handling: "Returns false if not found"
+
+      WorkspaceInvitationRepository:
+        description: "Data access layer for WorkspaceInvitation entity operations"
+        priority: "normal"
+        interface_methods:
+          - name: "Create"
+            description: "Creates new invitation"
+            parameters:
+              - name: "invitation"
+                type: "WorkspaceInvitation"
+            return_type: "WorkspaceInvitation"
+            error_handling: "Returns error if creation fails"
+          - name: "GetByToken"
+            description: "Retrieves invitation by token"
+            parameters:
+              - name: "token"
+                type: "string"
+            return_type: "WorkspaceInvitation"
+            error_handling: "Returns error if not found"
+          - name: "GetByWorkspaceID"
+            description: "Retrieves all invitations for a workspace"
+            parameters:
+              - name: "workspace_id"
+                type: "UUID"
+            return_type: "[]WorkspaceInvitation"
+            error_handling: "Returns empty slice if none found"
+          - name: "UpdateStatus"
+            description: "Updates invitation status"
+            parameters:
+              - name: "id"
+                type: "UUID"
+              - name: "status"
+                type: "string"
+            return_type: "error"
+            error_handling: "Returns error if update fails"
+          - name: "DeleteExpired"
+            description: "Deletes expired invitations"
+            parameters:
+              - name: "before_timestamp"
+                type: "Time"
+            return_type: "integer"
+            error_handling: "Returns count of deleted invitations"
+
+    # Events within this bounded context
+    events:
+      WorkspaceCreated:
+        description: "Emitted when a new workspace is successfully created."
+        user_journey: "User creates a new workspace and sees confirmation."
+        user_value: "Confirms workspace creation and starts collaboration setup."
+        payload_schema:
+          - field_name: "workspace_id"
+            type: "string"
+            description: "Unique identifier of the created workspace"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          - field_name: "name"
+            type: "string"
+            description: "Name of the workspace"
+            example: "Project Alpha Team"
+          - field_name: "slug"
+            type: "string"
+            description: "URL-friendly identifier"
+            example: "project-alpha-team"
+          - field_name: "owner_id"
+            type: "string"
+            description: "ID of the workspace owner"
+            example: "660f9511-f30c-52e5-b827-337766551111"
+          - field_name: "created_at"
+            type: "integer"
+            description: "Timestamp when workspace was created"
+            example: 1700000000
+        published_by: "workspace-service"
+        subscribed_clients:
+          - "notification-service"
+          - "audit-service"
+          - "analytics-service"
+        raising_conditions:
+          - "Workspace created successfully"
+
+      WorkspaceMemberAdded:
+        description: "Emitted when a new member is added to a workspace."
+        user_journey: "User is added to workspace and receives notification."
+        user_value: "Enables collaboration and access to workspace resources."
+        payload_schema:
+          - field_name: "workspace_id"
+            type: "string"
+            description: "ID of the workspace"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          - field_name: "member_id"
+            type: "string"
+            description: "ID of the added member"
+            example: "660f9511-f30c-52e5-b827-337766551111"
+          - field_name: "access_level"
+            type: "string"
+            description: "Access level granted to member"
+            example: "MEMBER"
+          - field_name: "added_by"
+            type: "string"
+            description: "ID of user who added the member"
+            example: "770g0622-g41d-63f6-d938-448877662222"
+          - field_name: "added_at"
+            type: "integer"
+            description: "Timestamp when member was added"
+            example: 1700000000
+        published_by: "workspace-service"
+        subscribed_clients:
+          - "notification-service"
+          - "audit-service"
+          - "user-service"
+        raising_conditions:
+          - "Member added to workspace successfully"
+
+      WorkspaceInvitationSent:
+        description: "Emitted when an invitation is sent to join a workspace."
+        user_journey: "System sends invitation email to potential member."
+        user_value: "Enables secure workspace access invitation."
+        payload_schema:
+          - field_name: "invitation_id"
+            type: "string"
+            description: "ID of the invitation"
+            example: "880h1733-h52e-74g7-e049-559988773333"
+          - field_name: "workspace_id"
+            type: "string"
+            description: "ID of the workspace"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          - field_name: "invited_email"
+            type: "string"
+            description: "Email address of invited user"
+            example: "user@example.com"
+          - field_name: "access_level"
+            type: "string"
+            description: "Access level offered"
+            example: "MEMBER"
+          - field_name: "invited_by"
+            type: "string"
+            description: "ID of user who sent invitation"
+            example: "770g0622-g41d-63f6-d938-448877662222"
+          - field_name: "expires_at"
+            type: "integer"
+            description: "Invitation expiration timestamp"
+            example: 1700086400
+        published_by: "workspace-service"
+        subscribed_clients:
+          - "notification-service"
+          - "audit-service"
+        raising_conditions:
+          - "Invitation sent successfully"
+
+      WorkspaceInvitationAccepted:
+        description: "Emitted when a user accepts a workspace invitation."
+        user_journey: "User accepts invitation and joins workspace."
+        user_value: "Confirms successful workspace membership."
+        payload_schema:
+          - field_name: "invitation_id"
+            type: "string"
+            description: "ID of the accepted invitation"
+            example: "880h1733-h52e-74g7-e049-559988773333"
+          - field_name: "workspace_id"
+            type: "string"
+            description: "ID of the workspace"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          - field_name: "member_id"
+            type: "string"
+            description: "ID of the new member"
+            example: "660f9511-f30c-52e5-b827-337766551111"
+          - field_name: "accepted_at"
+            type: "integer"
+            description: "Timestamp when invitation was accepted"
+            example: 1700000000
+        published_by: "workspace-service"
+        subscribed_clients:
+          - "notification-service"
+          - "audit-service"
+          - "user-service"
+        raising_conditions:
+          - "Invitation accepted successfully"
+
+      WorkspaceConfigUpdated:
+        description: "Emitted when workspace configuration is modified."
+        user_journey: "Admin updates workspace settings."
+        user_value: "Enables workspace customization and management."
+        payload_schema:
+          - field_name: "workspace_id"
+            type: "string"
+            description: "ID of the workspace"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          - field_name: "updated_fields"
+            type: "array"
+            description: "List of configuration fields that were updated"
+            example: ["max_members", "allow_public_access"]
+          - field_name: "updated_by"
+            type: "string"
+            description: "ID of user who made the changes"
+            example: "770g0622-g41d-63f6-d938-448877662222"
+          - field_name: "updated_at"
+            type: "integer"
+            description: "Timestamp when configuration was updated"
+            example: 1700000000
+        published_by: "workspace-service"
+        subscribed_clients:
+          - "audit-service"
+          - "notification-service"
+        raising_conditions:
+          - "Workspace configuration updated successfully"
+
+    # Use cases within this bounded context
+    use_cases:
+      CreateWorkspace:
+        description: "User creates a new collaborative workspace."
+        user_journey: "User fills out workspace creation form, system validates and creates workspace."
+        user_value: "Enables user to start organizing and collaborating with others."
+        primary_actors:
+          - "User"
+        entities_involved:
+          - "Workspace"
+          - "WorkspaceConfig"
+          - "WorkspaceMember"
+        aggregates_involved:
+          - "WorkspaceAggregate"
+        value_objects_involved:
+          - "WorkspaceName"
+          - "WorkspaceSlug"
+          - "AccessLevel"
+        preconditions:
+          - "User is authenticated"
+          - "User account is ACTIVE"
+        initiation_triggers:
+          - "User clicks 'Create Workspace' button"
+        steps:
+          main_flow:
+            - step: 1
+              action: "User enters workspace details (name, description, visibility)"
+            - step: 2
+              action: "System validates input and generates unique slug"
+            - step: 3
+              action: "System creates workspace record"
+            - step: 4
+              action: "System creates default configuration"
+            - step: 5
+              action: "System adds creator as owner member"
+            - step: 6
+              action: "System confirms workspace creation"
+          alternative_flows:
+            - name: "NameAlreadyExists"
+              conditions:
+                - "Workspace name already exists for this owner"
+              steps:
+                - step: 1
+                  action: "System notifies user that name is taken"
+            - name: "SlugAlreadyExists"
+              conditions:
+                - "Generated slug already exists globally"
+              steps:
+                - step: 1
+                  action: "System generates alternative slug"
+        events_emitted:
+          - "WorkspaceCreated"
+        business_rules:
+          - "Workspace name must be unique per owner"
+          - "Workspace slug must be globally unique"
+          - "Creator automatically becomes owner"
+        validation_rules:
+          - "Name format validation (3-100 characters)"
+          - "Description length validation (max 1000 characters)"
+          - "Visibility enum validation"
+
+      AddWorkspaceMember:
+        description: "Add a new member to an existing workspace."
+        user_journey: "Admin invites user to workspace, user receives invitation and joins."
+        user_value: "Enables team collaboration and resource sharing."
+        primary_actors:
+          - "Workspace Admin"
+          - "New Member"
+        entities_involved:
+          - "Workspace"
+          - "WorkspaceMember"
+          - "WorkspaceInvitation"
+        aggregates_involved:
+          - "WorkspaceAggregate"
+        value_objects_involved:
+          - "AccessLevel"
+        preconditions:
+          - "User has permission to add members"
+          - "Workspace exists and is ACTIVE"
+          - "Target user account exists"
+        initiation_triggers:
+          - "Admin clicks 'Add Member' button"
+        steps:
+          main_flow:
+            - step: 1
+              action: "Admin enters member email and selects access level"
+            - step: 2
+              action: "System validates member email and access level"
+            - step: 3
+              action: "System creates invitation record"
+            - step: 4
+              action: "System sends invitation email to member"
+            - step: 5
+              action: "Member receives email and clicks invitation link"
+            - step: 6
+              action: "System validates invitation token"
+            - step: 7
+              action: "System creates member record"
+            - step: 8
+              action: "System confirms member addition"
+          alternative_flows:
+            - name: "UserAlreadyMember"
+              conditions:
+                - "User is already a member of the workspace"
+              steps:
+                - step: 1
+                  action: "System notifies admin that user is already a member"
+            - name: "InvalidAccessLevel"
+              conditions:
+                - "Selected access level is not allowed"
+              steps:
+                - step: 1
+                  action: "System notifies admin of invalid access level"
+        events_emitted:
+          - "WorkspaceInvitationSent"
+          - "WorkspaceMemberAdded"
+        business_rules:
+          - "Cannot invite users with OWNER access level"
+          - "User cannot be added if already a member"
+          - "Invitations expire after 7 days"
+
+      UpdateWorkspaceConfig:
+        description: "Admin updates workspace configuration settings."
+        user_journey: "Admin modifies workspace settings, system applies changes."
+        user_value: "Enables workspace customization and management."
+        primary_actors:
+          - "Workspace Admin"
+        entities_involved:
+          - "Workspace"
+          - "WorkspaceConfig"
+        aggregates_involved:
+          - "WorkspaceAggregate"
+        preconditions:
+          - "User has permission to modify workspace configuration"
+          - "Workspace exists and is ACTIVE"
+        initiation_triggers:
+          - "Admin clicks 'Update Settings' button"
+        steps:
+          main_flow:
+            - step: 1
+              action: "Admin modifies configuration settings"
+            - step: 2
+              action: "System validates configuration changes"
+            - step: 3
+              action: "System updates configuration record"
+            - step: 4
+              action: "System confirms configuration update"
+          alternative_flows:
+            - name: "InvalidConfiguration"
+              conditions:
+                - "Configuration values are invalid"
+              steps:
+                - step: 1
+                  action: "System notifies admin of validation errors"
+            - name: "ConfigurationConflict"
+              conditions:
+                - "New configuration conflicts with existing settings"
+              steps:
+                - step: 1
+                  action: "System resolves conflicts or notifies admin"
+        events_emitted:
+          - "WorkspaceConfigUpdated"
+        business_rules:
+          - "Max members cannot be less than current member count"
+          - "Public access changes require owner approval"
+          - "Configuration changes are logged for audit"
+
+    # Aggregates within this bounded context
+    aggregates:
+      WorkspaceAggregate:
+        root_entity: "Workspace"
+        description: "Encapsulates the Workspace entity and related behaviors, including member management, configuration, and invitation handling."
+        invariants:
+          - "Workspace entity invariants must always hold"
+          - "WorkspaceConfig must exist with workspace_id equal to Workspace id"
+          - "WorkspaceMember entities must belong to the aggregate's workspace"
+          - "WorkspaceInvitation entities must belong to the aggregate's workspace"
+          - "Member access levels must be valid and consistent"
+          - "Configuration changes must maintain workspace integrity"
+          - "Member lifecycle must be properly managed (addition, updates, removal)"
+
+  workspace_collaboration:
+    description: "Manages collaborative features and real-time interactions within workspaces"
+    domain: "Workspace"
+    priority: "normal"
+    responsibilities:
+      - "Real-time collaboration tools"
+      - "Document sharing and editing"
+      - "Team communication features"
+      - "Activity tracking and notifications"
+    external_dependencies:
+      - "document-service: for file management"
+      - "chat-service: for real-time communication"
+      - "notification-service: for activity updates"
+    
+    # Additional entities and use cases for collaboration will be added here
+    entities: {}
+    use_cases: {}
+    events: {}
+
+  workspace_analytics:
+    description: "Tracks and analyzes workspace usage, member activity, and collaboration metrics"
+    domain: "Workspace"
+    priority: "normal"
+    responsibilities:
+      - "Workspace activity tracking"
+      - "Member engagement metrics"
+      - "Collaboration analytics"
+      - "Performance insights"
+    external_dependencies:
+      - "analytics-service: for data processing"
+      - "reporting-service: for report generation"
+      - "notification-service: for insights"
+    
+    # Additional entities and use cases for analytics will be added here
+    entities: {}
+    use_cases: {}
+    events: {}
+
+# =============================================================================
+# 3. CROSS-CONTEXT USE CASES
+# =============================================================================
+cross_context_use_cases:
+  UserWorkspaceAccess:
+    description: "User accesses and interacts with workspaces they are members of."
+    user_journey: "User navigates to workspace, system validates access and loads content."
+    user_value: "Enables secure access to collaborative workspaces."
+    primary_actors:
+      - "User"
+    bounded_contexts_involved:
+      - "workspace_management"
+      - "authentication"
+    entities_involved:
+      - "Workspace"
+      - "WorkspaceMember"
+      - "Account"
+    aggregates_involved:
+      - "WorkspaceAggregate"
+    preconditions:
+      - "User is authenticated"
+      - "User is member of the workspace"
+      - "Workspace is ACTIVE"
+    initiation_triggers:
+      - "User navigates to workspace URL"
+    steps:
+      main_flow:
+        - step: 1
+          action: "User requests access to workspace"
+        - step: 2
+          action: "System validates user authentication and membership"
+        - step: 3
+          action: "System loads workspace content and configuration"
+        - step: 4
+          action: "System grants access based on member permissions"
+      alternative_flows:
+        - name: "AccessDenied"
+          conditions:
+            - "User is not a member of the workspace"
+          steps:
+            - step: 1
+              action: "System redirects to workspace invitation page"
+        - name: "WorkspaceInactive"
+          conditions:
+            - "Workspace is ARCHIVED or DELETED"
+          steps:
+            - step: 1
+              action: "System shows workspace unavailable message"
+    events_emitted:
+      - "WorkspaceAccessed"
+    business_rules:
+      - "Access level determines available features"
+      - "Workspace status must be ACTIVE for access"
+      - "Access attempts are logged for audit"
+
+# =============================================================================
+# 4. CROSS-CONTEXT EVENTS
+# =============================================================================
+cross_context_events:
+  WorkspaceAccessed:
+    bounded_contexts: ["workspace_management", "authentication"]
+    description: "Emitted when a user successfully accesses a workspace."
+    user_journey: "User gains access to workspace content and features."
+    user_value: "Enables workspace collaboration and resource access."
+    payload_schema:
+      - field_name: "workspace_id"
+        type: "string"
+        description: "ID of the accessed workspace"
+        example: "550e8400-e29b-41d4-a716-446655440000"
+      - field_name: "user_id"
+        type: "string"
+        description: "ID of the user who accessed the workspace"
+        example: "660f9511-f30c-52e5-b827-337766551111"
+      - field_name: "access_level"
+        type: "string"
+        description: "User's access level in the workspace"
+        example: "MEMBER"
+      - field_name: "accessed_at"
+        type: "integer"
+        description: "Timestamp when workspace was accessed"
+        example: 1700000000
+      - field_name: "ip_address"
+        type: "string"
+        description: "IP address of the access attempt"
+        example: "192.168.1.100"
+    published_by: "workspace-service"
+    subscribed_clients:
+      - "audit-service"
+      - "analytics-service"
+      - "user-service"
+    raising_conditions:
+      - "User successfully accessed workspace"
+
+# =============================================================================
+# 5. DOMAIN-WIDE CONFIGURATIONS
+# =============================================================================
+domain_configurations:
+  security_considerations:
+    access_control:
+      - "Access levels must be properly validated on all operations"
+      - "Workspace invitations must expire after 7 days"
+      - "Member removal requires appropriate permissions"
+      - "Configuration changes must be logged for audit"
+    data_protection:
+      - "Workspace data must be isolated by workspace boundaries"
+      - "Member information must be protected from unauthorized access"
+      - "Workspace deletion must be soft-delete with proper cleanup"
+
+  performance_requirements:
+    response_times:
+      - "Workspace creation: < 2 seconds"
+      - "Member addition: < 1 second"
+      - "Configuration updates: < 500ms"
+    scalability:
+      - "Support 1000 concurrent workspace operations"
+      - "Handle 100 member additions per minute"
+      - "Database connection pooling with max 50 connections"
+
+  monitoring_and_alerting:
+    metrics:
+      - "Workspace creation rate"
+      - "Member addition/removal rates"
+      - "Workspace access patterns"
+      - "Configuration change frequency"
+    alerts:
+      - "High workspace creation rate (>50 per hour)"
+      - "Unusual member activity patterns"
+      - "Workspace access failures"
+      - "Configuration change conflicts"
+
+# =============================================================================
+# 6. DELIVERY LAYER (API ENDPOINTS)
+# =============================================================================
+delivery:
+  description: "HTTP API endpoints and request/response handling for workspace operations"
+  base_path: "/workspace/v1"
+  controllers:
+    WorkspaceController:
+      description: "Handles workspace-related HTTP requests and responses"
+      endpoints:
+        # Workspace Creation
+        - path: "/"
+          method: "POST"
+          description: "Create a new workspace"
+          security:
+            - bearerAuth: []
+          request_body:
+            type: "object"
+            required: ["name"]
+            properties:
+              name:
+                type: "string"
+                minLength: 3
+                maxLength: 100
+                description: "Workspace name"
+                example: "Project Alpha Team"
+              description:
+                type: "string"
+                maxLength: 1000
+                description: "Workspace description (optional)"
+                example: "Team workspace for Project Alpha development"
+              visibility:
+                type: "string"
+                enum: ["PUBLIC", "PRIVATE", "RESTRICTED"]
+                default: "PRIVATE"
+                description: "Workspace visibility level"
+                example: "PRIVATE"
+          responses:
+            201:
+              description: "Workspace created successfully"
+              body:
+                type: "object"
+                properties:
+                  message:
+                    type: "string"
+                    example: "Workspace created successfully"
+                  workspace:
+                    type: "object"
+                    properties:
+                      id:
+                        type: "string"
+                        format: "uuid"
+                      name:
+                        type: "string"
+                      slug:
+                        type: "string"
+                      description:
+                        type: "string"
+                      visibility:
+                        type: "string"
+                      owner_id:
+                        type: "string"
+                        format: "uuid"
+                      created_at:
+                        type: "integer"
+            400:
+              description: "Bad request - validation errors"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Validation failed"
+                  details:
+                    type: "array"
+                    items:
+                      type: "object"
+                      properties:
+                        field:
+                          type: "string"
+                        message:
+                          type: "string"
+            409:
+              description: "Conflict - workspace name already exists"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Workspace name already exists"
+
+        # Get Workspace by Slug
+        - path: "/{slug}"
+          method: "GET"
+          description: "Get workspace details by slug"
+          security:
+            - bearerAuth: []
+          parameters:
+            - name: "slug"
+              in: "path"
+              required: true
+              schema:
+                type: "string"
+              description: "Workspace slug"
+          responses:
+            200:
+              description: "Workspace details retrieved successfully"
+              body:
+                type: "object"
+                properties:
+                  workspace:
+                    type: "object"
+                    properties:
+                      id:
+                        type: "string"
+                        format: "uuid"
+                      name:
+                        type: "string"
+                      slug:
+                        type: "string"
+                      description:
+                        type: "string"
+                      visibility:
+                        type: "string"
+                      status:
+                        type: "string"
+                      owner_id:
+                        type: "string"
+                        format: "uuid"
+                      created_at:
+                        type: "integer"
+                      updated_at:
+                        type: "integer"
+                      member_count:
+                        type: "integer"
+                        description: "Number of members in the workspace"
+                      user_access_level:
+                        type: "string"
+                        description: "Current user's access level in this workspace"
+            401:
+              description: "Unauthorized"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Unauthorized"
+            404:
+              description: "Workspace not found"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Workspace not found"
+
+        # Update Workspace
+        - path: "/{slug}"
+          method: "PUT"
+          description: "Update workspace details"
+          security:
+            - bearerAuth: []
+          parameters:
+            - name: "slug"
+              in: "path"
+              required: true
+              schema:
+                type: "string"
+              description: "Workspace slug"
+          request_body:
+            type: "object"
+            properties:
+              name:
+                type: "string"
+                minLength: 3
+                maxLength: 100
+                description: "New workspace name"
+                example: "Project Alpha Team Updated"
+              description:
+                type: "string"
+                maxLength: 1000
+                description: "New workspace description"
+                example: "Updated description for Project Alpha"
+              visibility:
+                type: "string"
+                enum: ["PUBLIC", "PRIVATE", "RESTRICTED"]
+                description: "New visibility level"
+                example: "PUBLIC"
+          responses:
+            200:
+              description: "Workspace updated successfully"
+              body:
+                type: "object"
+                properties:
+                  message:
+                    type: "string"
+                    example: "Workspace updated successfully"
+                  workspace:
+                    type: "object"
+                    properties:
+                      id:
+                        type: "string"
+                        format: "uuid"
+                      updated_at:
+                        type: "integer"
+            400:
+              description: "Bad request - validation errors"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Validation failed"
+            401:
+              description: "Unauthorized"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Unauthorized"
+            403:
+              description: "Forbidden - insufficient permissions"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Insufficient permissions to update workspace"
+
+        # Delete Workspace
+        - path: "/{slug}"
+          method: "DELETE"
+          description: "Delete (archive) workspace"
+          security:
+            - bearerAuth: []
+          parameters:
+            - name: "slug"
+              in: "path"
+              required: true
+              schema:
+                type: "string"
+              description: "Workspace slug"
+          responses:
+            200:
+              description: "Workspace deleted successfully"
+              body:
+                type: "object"
+                properties:
+                  message:
+                    type: "string"
+                    example: "Workspace deleted successfully"
+                  deleted_at:
+                    type: "integer"
+            401:
+              description: "Unauthorized"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Unauthorized"
+            403:
+              description: "Forbidden - only owner can delete workspace"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Only workspace owner can delete the workspace"
+
+        # Get User's Workspaces
+        - path: "/my"
+          method: "GET"
+          description: "Get all workspaces where current user is a member"
+          security:
+            - bearerAuth: []
+          parameters:
+            - name: "limit"
+              in: "query"
+              schema:
+                type: "integer"
+                default: 20
+                maximum: 100
+              description: "Maximum number of workspaces to return"
+            - name: "offset"
+              in: "query"
+              schema:
+                type: "integer"
+                default: 0
+              description: "Number of workspaces to skip"
+            - name: "status"
+              in: "query"
+              schema:
+                type: "string"
+                enum: ["ACTIVE", "ARCHIVED"]
+              description: "Filter by workspace status"
+          responses:
+            200:
+              description: "User's workspaces retrieved successfully"
+              body:
+                type: "object"
+                properties:
+                  workspaces:
+                    type: "array"
+                    items:
+                      type: "object"
+                      properties:
+                        id:
+                          type: "string"
+                          format: "uuid"
+                        name:
+                          type: "string"
+                        slug:
+                          type: "string"
+                        description:
+                          type: "string"
+                        visibility:
+                          type: "string"
+                        status:
+                          type: "string"
+                        access_level:
+                          type: "string"
+                          description: "User's access level in this workspace"
+                        member_count:
+                          type: "integer"
+                        last_activity_at:
+                          type: "integer"
+                        created_at:
+                          type: "integer"
+                  total:
+                    type: "integer"
+                    description: "Total number of workspaces"
+                  limit:
+                    type: "integer"
+                  offset:
+                    type: "integer"
+            401:
+              description: "Unauthorized"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Unauthorized"
+
+    WorkspaceMemberController:
+      description: "Handles workspace member management HTTP requests and responses"
+      endpoints:
+        # Get Workspace Members
+        - path: "/{slug}/members"
+          method: "GET"
+          description: "Get all members of a workspace"
+          security:
+            - bearerAuth: []
+          parameters:
+            - name: "slug"
+              in: "path"
+              required: true
+              schema:
+                type: "string"
+              description: "Workspace slug"
+            - name: "limit"
+              in: "query"
+              schema:
+                type: "integer"
+                default: 50
+                maximum: 200
+              description: "Maximum number of members to return"
+            - name: "offset"
+              in: "query"
+              schema:
+                type: "integer"
+                default: 0
+              description: "Number of members to skip"
+          responses:
+            200:
+              description: "Workspace members retrieved successfully"
+              body:
+                type: "object"
+                properties:
+                  members:
+                    type: "array"
+                    items:
+                      type: "object"
+                      properties:
+                        id:
+                          type: "string"
+                          format: "uuid"
+                        account_id:
+                          type: "string"
+                          format: "uuid"
+                        username:
+                          type: "string"
+                        full_name:
+                          type: "string"
+                        access_level:
+                          type: "string"
+                        status:
+                          type: "string"
+                        joined_at:
+                          type: "integer"
+                        last_activity_at:
+                          type: "integer"
+                  total:
+                    type: "integer"
+                    description: "Total number of members"
+                  limit:
+                    type: "integer"
+                  offset:
+                    type: "integer"
+            401:
+              description: "Unauthorized"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Unauthorized"
+            404:
+              description: "Workspace not found"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Workspace not found"
+
+        # Invite Member to Workspace
+        - path: "/{slug}/invite"
+          method: "POST"
+          description: "Invite a user to join the workspace"
+          security:
+            - bearerAuth: []
+          parameters:
+            - name: "slug"
+              in: "path"
+              required: true
+              schema:
+                type: "string"
+              description: "Workspace slug"
+          request_body:
+            type: "object"
+            required: ["email", "access_level"]
+            properties:
+              email:
+                type: "string"
+                format: "email"
+                description: "Email address of the user to invite"
+                example: "user@example.com"
+              access_level:
+                type: "string"
+                enum: ["ADMIN", "MEMBER", "GUEST"]
+                description: "Access level to grant to the invited user"
+                example: "MEMBER"
+              message:
+                type: "string"
+                maxLength: 500
+                description: "Personal message to include in invitation (optional)"
+                example: "I'd like to invite you to join our project team"
+          responses:
+            201:
+              description: "Invitation sent successfully"
+              body:
+                type: "object"
+                properties:
+                  message:
+                    type: "string"
+                    example: "Invitation sent successfully"
+                  invitation:
+                    type: "object"
+                    properties:
+                      id:
+                        type: "string"
+                        format: "uuid"
+                      invited_email:
+                        type: "string"
+                      access_level:
+                        type: "string"
+                      expires_at:
+                        type: "integer"
+                      created_at:
+                        type: "integer"
+            400:
+              description: "Bad request - validation errors"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Validation failed"
+            401:
+              description: "Unauthorized"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Unauthorized"
+            403:
+              description: "Forbidden - insufficient permissions"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Insufficient permissions to invite members"
+
+        # Accept Workspace Invitation
+        - path: "/invite/{token}/accept"
+          method: "POST"
+          description: "Accept a workspace invitation using invitation token"
+          security:
+            - bearerAuth: []
+          parameters:
+            - name: "token"
+              in: "path"
+              required: true
+              schema:
+                type: "string"
+              description: "Invitation token"
+          responses:
+            200:
+              description: "Invitation accepted successfully"
+              body:
+                type: "object"
+                properties:
+                  message:
+                    type: "string"
+                    example: "Welcome to the workspace!"
+                  workspace:
+                    type: "object"
+                    properties:
+                      id:
+                        type: "string"
+                        format: "uuid"
+                      name:
+                        type: "string"
+                      slug:
+                        type: "string"
+                      access_level:
+                        type: "string"
+                        description: "Access level granted to the user"
+            400:
+              description: "Invalid or expired invitation token"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Invalid or expired invitation token"
+            401:
+              description: "Unauthorized"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Unauthorized"
+            409:
+              description: "User is already a member of this workspace"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "You are already a member of this workspace"
+
+        # Update Member Access Level
+        - path: "/{slug}/members/{member_id}/access"
+          method: "PUT"
+          description: "Update a member's access level in the workspace"
+          security:
+            - bearerAuth: []
+          parameters:
+            - name: "slug"
+              in: "path"
+              required: true
+              schema:
+                type: "string"
+              description: "Workspace slug"
+            - name: "member_id"
+              in: "path"
+              required: true
+              schema:
+                type: "string"
+                format: "uuid"
+              description: "Member ID"
+          request_body:
+            type: "object"
+            required: ["access_level"]
+            properties:
+              access_level:
+                type: "string"
+                enum: ["ADMIN", "MEMBER", "GUEST"]
+                description: "New access level for the member"
+                example: "ADMIN"
+          responses:
+            200:
+              description: "Member access level updated successfully"
+              body:
+                type: "object"
+                properties:
+                  message:
+                    type: "string"
+                    example: "Member access level updated successfully"
+                  member:
+                    type: "object"
+                    properties:
+                      id:
+                        type: "string"
+                        format: "uuid"
+                      access_level:
+                        type: "string"
+                      updated_at:
+                        type: "integer"
+            400:
+              description: "Bad request - invalid access level"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Invalid access level"
+            401:
+              description: "Unauthorized"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Unauthorized"
+            403:
+              description: "Forbidden - insufficient permissions"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Insufficient permissions to update member access"
+
+        # Remove Member from Workspace
+        - path: "/{slug}/members/{member_id}"
+          method: "DELETE"
+          description: "Remove a member from the workspace"
+          security:
+            - bearerAuth: []
+          parameters:
+            - name: "slug"
+              in: "path"
+              required: true
+              schema:
+                type: "string"
+              description: "Workspace slug"
+            - name: "member_id"
+              in: "path"
+              required: true
+              schema:
+                type: "string"
+                format: "uuid"
+              description: "Member ID"
+          responses:
+            200:
+              description: "Member removed successfully"
+              body:
+                type: "object"
+                properties:
+                  message:
+                    type: "string"
+                    example: "Member removed successfully"
+                  removed_at:
+                    type: "integer"
+            401:
+              description: "Unauthorized"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Unauthorized"
+            403:
+              description: "Forbidden - insufficient permissions or cannot remove owner"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Cannot remove workspace owner"
+
+    WorkspaceConfigController:
+      description: "Handles workspace configuration HTTP requests and responses"
+      endpoints:
+        # Get Workspace Configuration
+        - path: "/{slug}/config"
+          method: "GET"
+          description: "Get workspace configuration settings"
+          security:
+            - bearerAuth: []
+          parameters:
+            - name: "slug"
+              in: "path"
+              required: true
+              schema:
+                type: "string"
+              description: "Workspace slug"
+          responses:
+            200:
+              description: "Workspace configuration retrieved successfully"
+              body:
+                type: "object"
+                properties:
+                  config:
+                    type: "object"
+                    properties:
+                      allow_public_access:
+                        type: "boolean"
+                        description: "Whether the workspace allows public access"
+                      require_approval_for_join:
+                        type: "boolean"
+                        description: "Whether approval is required for new members"
+                      max_members:
+                        type: "integer"
+                        description: "Maximum number of members allowed"
+                      default_access_level:
+                        type: "string"
+                        description: "Default access level for new members"
+                      updated_at:
+                        type: "integer"
+            401:
+              description: "Unauthorized"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Unauthorized"
+            404:
+              description: "Workspace not found"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Workspace not found"
+
+        # Update Workspace Configuration
+        - path: "/{slug}/config"
+          method: "PUT"
+          description: "Update workspace configuration settings"
+          security:
+            - bearerAuth: []
+          parameters:
+            - name: "slug"
+              in: "path"
+              required: true
+              schema:
+                type: "string"
+              description: "Workspace slug"
+          request_body:
+            type: "object"
+            properties:
+              allow_public_access:
+                type: "boolean"
+                description: "Whether to allow public access to the workspace"
+                example: false
+              require_approval_for_join:
+                type: "boolean"
+                description: "Whether to require approval for new members"
+                example: true
+              max_members:
+                type: "integer"
+                minimum: 1
+                maximum: 1000
+                description: "Maximum number of members allowed"
+                example: 100
+              default_access_level:
+                type: "string"
+                enum: ["ADMIN", "MEMBER", "GUEST"]
+                description: "Default access level for new members"
+                example: "MEMBER"
+          responses:
+            200:
+              description: "Configuration updated successfully"
+              body:
+                type: "object"
+                properties:
+                  message:
+                    type: "string"
+                    example: "Configuration updated successfully"
+                  config:
+                    type: "object"
+                    properties:
+                      updated_at:
+                        type: "integer"
+            400:
+              description: "Bad request - validation errors"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Validation failed"
+            401:
+              description: "Unauthorized"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Unauthorized"
+            403:
+              description: "Forbidden - insufficient permissions"
+              body:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Insufficient permissions to update configuration"
+
+  # API Documentation
+  api_documentation:
+    openapi_version: "3.0.3"
+    info:
+      title: "Workspace Management API"
+      description: "API for workspace creation, management, and member operations"
+      version: "1.0.0"
+      contact:
+        name: "API Support"
+        email: "support@example.com"
+    servers:
+      - url: "https://api.example.com"
+        description: "Production server"
+      - url: "https://staging-api.example.com"
+        description: "Staging server"
+    components:
+      securitySchemes:
+        bearerAuth:
+          type: "http"
+          scheme: "bearer"
+          bearerFormat: "JWT"
+      schemas:
+        Error:
+          type: "object"
+          properties:
+            error:
+              type: "string"
+              description: "Error message"
+            details:
+              type: "array"
+              items:
+                type: "object"
+                properties:
+                  field:
+                    type: "string"
+                  message:
+                    type: "string"
+    tags:
+      - name: "Workspaces"
+        description: "Workspace creation and management endpoints"
+      - name: "Members"
+        description: "Workspace member management endpoints"
+      - name: "Configuration"
+        description: "Workspace configuration management endpoints"

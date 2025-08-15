@@ -1,0 +1,4554 @@
+# =============================================================================
+# User Domain: Complete Service Specification
+#   - Building Blocks: Entities, Value Objects, and Aggregates
+#   - Use Cases and Events (with DB mapping, required, and relationships)
+#   - Bounded Contexts and Domain Boundaries
+# =============================================================================
+
+# =============================================================================
+# 1. VALUE OBJECTS (Shared across all bounded contexts)
+# =============================================================================
+value_objects:
+  UUID:
+    description: "Universally unique identifier for entities."
+    priority: "high"
+    attributes:
+      - name: "value"
+        type: "string"
+        db_primitive: "uuid"
+        required: true
+    invariants:
+      - "Must be a valid UUID v4 format"
+      - "Must be globally unique"
+    methods:
+      - name: "generate"
+        description: "Generates a new UUID v4"
+        return_type: "UUID"
+      - name: "is_valid"
+        description: "Validates UUID format"
+        return_type: "boolean"
+        
+  Time:
+    description: "Epoch time used globally"
+    priority: "high"
+    attributes:
+      - name: "value"
+        type: "integer"
+        db_primitive: "number"
+        required: true
+        example: 1700000000
+    invariants:
+      - "Must be valid epoch time (non-negative integer)"
+      - "Represents seconds since Unix epoch (1970-01-01T00:00:00Z)"
+    methods:
+      - name: "to_datetime"
+        description: "Converts epoch time to human-readable datetime in UTC"
+        return_type: "datetime"
+      - name: "from_datetime"
+        description: "Creates a Time object from a datetime value"
+        parameters:
+          - name: "datetime"
+            type: "datetime"
+        return_type: "Time"
+    examples:
+      valid:
+        - value: 1700000000
+      invalid:
+        - value: -12345
+        - value: "2023-01-01"
+
+  Email:
+    description: "Email address of a user, validated and normalized."
+    priority: "high"
+    attributes:
+      - name: "value"
+        type: "string"
+        db_primitive: "varchar(255)"
+        required: true
+    invariants:
+      - "Must be valid email format"
+      - "Must be normalized to lowercase"
+      - "Max length 255 characters"
+    methods:
+      - name: "normalize"
+        description: "Converts the email address to lowercase and trims whitespace."
+        return_type: "Email"
+      - name: "is_valid"
+        description: "Checks if the email address is in a valid format."
+        return_type: "boolean"
+      - name: "get_domain"
+        description: "Extracts the domain part of the email address."
+        return_type: "string"
+      - name: "mask"
+        description: "Returns a masked version of the email for privacy (e.g., j***@domain.com)."
+        return_type: "string"
+
+  Password:
+    description: "Secure password string before hashing."
+    priority: "high"
+    attributes:
+      - name: "value"
+        type: "string"
+        db_primitive: "varchar(128)"
+        required: true
+    invariants:
+      - "Must have minimum length of 8 characters"
+      - "Must contain uppercase, lowercase, and number"
+      - "Must be hashed before storage"
+    methods:
+      - name: "is_valid"
+        description: "Checks if the password meets all security requirements (length, character types)."
+        return_type: "boolean"
+
+# =============================================================================
+# 2. BOUNDED CONTEXTS
+# =============================================================================
+bounded_contexts:
+  authentication:
+    description: "Handles user authentication, registration, and account management"
+    domain: "User"
+    priority: "high"
+    responsibilities:
+      - "User registration and verification"
+      - "Authentication and session management"
+      - "Password management and security"
+      - "Account security monitoring"
+    external_dependencies:
+      - "notification-service: for sending emails"
+      - "audit-service: for logging security events"
+      - "analytics-service: for user behavior tracking"
+      - "security-service: for threat detection"
+    
+    # Entities within this bounded context
+    entities:
+      Account:
+        description: "Represents a registered system user with authentication credentials."
+        priority: "high"
+        attributes:
+          - name: "id"
+            type: "UUID"
+            db_primitive: "uuid"
+            required: true
+          - name: "email"
+            type: "Email"
+            value_object: "Email"
+            db_primitive: "varchar(255)"
+            required: true
+          - name: "password_hash"
+            type: "string"
+            db_primitive: "varchar(255)"
+            required: true
+          - name: "username"
+            type: "string"
+            db_primitive: "varchar(100)"
+            required: true
+          - name: "full_name"
+            type: "string"
+            db_primitive: "varchar(255)"
+            required: false
+          - name: "status"
+            type: "enum: [PENDING, ACTIVE, SUSPENDED]"
+            db_primitive: "enum('PENDING','ACTIVE','SUSPENDED')"
+            required: true
+          - name: "is_email_verified"
+            type: "boolean"
+            db_primitive: "boolean"
+            required: true
+          - name: "created_at"
+            type: "Time"
+            db_primitive: "number"
+            required: true
+          - name: "updated_at"
+            type: "Time"
+            db_primitive: "number"
+            required: true
+        invariants:
+          - "Email and Username must always be unique across the system"
+          - "Password hash must never be null or stored in plain text"
+          - "Status must always be one of the allowed enum values"
+          - "Account must always have an associated AccountSecurity record"
+
+      AccountSecurity:
+        description: "Manages security-related properties and account protection mechanisms for a user."
+        priority: "normal"
+        attributes:
+          - name: "id"
+            type: "UUID"
+            db_primitive: "uuid"
+            required: true
+            relationship:
+              type: "one-to-one"
+              target: "Account.id"
+          - name: "last_login_at"
+            type: "Time"
+            db_primitive: "number"
+            required: false
+          - name: "failed_login_attempts"
+            type: "integer"
+            db_primitive: "integer"
+            required: true
+            default: 0
+          - name: "account_locked_until"
+            type: "Time"
+            db_primitive: "number"
+            required: false
+          - name: "password_changed_at"
+            type: "Time"
+            db_primitive: "number"
+            required: false
+          - name: "two_factor_enabled"
+            type: "boolean"
+            db_primitive: "boolean"
+            required: true
+            default: false
+          - name: "two_factor_secret"
+            type: "string"
+            db_primitive: "varchar(255)"
+            required: false
+          - name: "created_at"
+            type: "Time"
+            db_primitive: "number"
+            required: true
+          - name: "updated_at"
+            type: "Time"
+            db_primitive: "number"
+            required: true
+        invariants:
+          - "Failed login attempts must be non-negative"
+          - "Account locked until must be in the future if set"
+          - "Two factor secret must be encrypted if present"
+          - "AccountSecurity id must always match a valid user id"
+          - "Password changed timestamp must be in the past if set"
+
+      EmailVerificationToken:
+        description: "Token used to verify a user's email address."
+        priority: "high"
+        attributes:
+          - name: "token"
+            type: "string"
+            db_primitive: "varchar(255)"
+            required: true
+          - name: "account_id"
+            type: "UUID"
+            db_primitive: "uuid"
+            required: true
+            relationship:
+              type: "many-to-one"
+              target: "Account.id"
+          - name: "expires_at"
+            type: "Time"
+            db_primitive: "number"
+            required: true
+          - name: "created_at"
+            type: "Time"
+            db_primitive: "number"
+            required: true
+          - name: "used_at"
+            type: "Time"
+            db_primitive: "number"
+            required: false
+        invariants:
+          - "Token must always be associated with a valid account"
+          - "Expiration date must be in the future at creation time"
+          - "Token can only be used once"
+
+      PasswordResetToken:
+        description: "Token used to reset a user's password."
+        priority: "normal"
+        attributes:
+          - name: "token"
+            type: "string"
+            db_primitive: "varchar(255)"
+            required: true
+          - name: "account_id"
+            type: "UUID"
+            db_primitive: "uuid"
+            required: true
+            relationship:
+              type: "many-to-one"
+              target: "Account.id"
+          - name: "expires_at"
+            type: "Time"
+            db_primitive: "number"
+            required: true
+          - name: "created_at"
+            type: "Time"
+            db_primitive: "number"
+            required: true
+          - name: "used_at"
+            type: "Time"
+            db_primitive: "number"
+            required: false
+        invariants:
+          - "Token must always be associated with a valid account"
+          - "Expiration date must be in the future at creation time"
+          - "Token can only be used once"
+
+      Session:
+        description: "Represents an active user session with authentication and metadata."
+        priority: "normal"
+        attributes:
+          - name: "id"
+            type: "UUID"
+            db_primitive: "uuid"
+            required: true
+          - name: "account_id"
+            type: "UUID"
+            db_primitive: "uuid"
+            required: true
+            relationship:
+              type: "many-to-one"
+              target: "Account.id"
+          - name: "refresh_token"
+            type: "string"
+            db_primitive: "varchar(255)"
+            required: true
+          - name: "access_token_hash"
+            type: "string"
+            db_primitive: "varchar(255)"
+            required: true
+          - name: "ip_address"
+            type: "string"
+            db_primitive: "varchar(45)"
+            required: true
+          - name: "user_agent"
+            type: "string"
+            db_primitive: "text"
+            required: false
+          - name: "device_type"
+            type: "string"
+            db_primitive: "varchar(50)"
+            required: false
+          - name: "location"
+            type: "string"
+            db_primitive: "varchar(255)"
+            required: false
+          - name: "is_active"
+            type: "boolean"
+            db_primitive: "boolean"
+            required: true
+            default: true
+          - name: "created_at"
+            type: "Time"
+            db_primitive: "number"
+            required: true
+          - name: "expires_at"
+            type: "Time"
+            db_primitive: "number"
+            required: true
+          - name: "last_activity_at"
+            type: "Time"
+            db_primitive: "number"
+            required: true
+          - name: "terminated_at"
+            type: "Time"
+            db_primitive: "number"
+            required: false
+          - name: "termination_reason"
+            type: "string"
+            db_primitive: "varchar(100)"
+            required: false
+        invariants:
+          - "Session must always be associated with a valid account"
+          - "Expiration date must be in the future at creation time"
+          - "Session can only be active if not terminated"
+          - "Last activity must be updated on each request"
+          - "Termination reason must be set when session is terminated"
+
+    # Repository layer within this bounded context
+    repositories:
+      AccountRepository:
+        description: "Data access layer for Account entity operations"
+        priority: "high"
+        interface_methods:
+          - name: "Create"
+            description: "Creates a new account"
+            parameters:
+              - name: "account"
+                type: "Account"
+            return_type: "Account"
+            error_handling: "Returns error if email/username already exists"
+          - name: "GetByID"
+            description: "Retrieves account by ID"
+            parameters:
+              - name: "id"
+                type: "UUID"
+            return_type: "Account"
+            error_handling: "Returns error if account not found"
+          - name: "GetByEmail"
+            description: "Retrieves account by email address"
+            parameters:
+              - name: "email"
+                type: "string"
+            return_type: "Account"
+            error_handling: "Returns error if account not found"
+          - name: "GetByUsername"
+            description: "Retrieves account by username"
+            parameters:
+              - name: "username"
+                type: "string"
+            return_type: "Account"
+            error_handling: "Returns error if account not found"
+          - name: "Update"
+            description: "Updates existing account"
+            parameters:
+              - name: "account"
+                type: "Account"
+            return_type: "Account"
+            error_handling: "Returns error if update fails"
+          - name: "Delete"
+            description: "Soft deletes account (marks as SUSPENDED)"
+            parameters:
+              - name: "id"
+                type: "UUID"
+            return_type: "error"
+            error_handling: "Returns error if deletion fails"
+          - name: "Exists"
+            description: "Checks if account exists by email or username"
+            parameters:
+              - name: "email"
+                type: "string"
+              - name: "username"
+                type: "string"
+            return_type: "boolean"
+            error_handling: "Returns false if not found"
+
+      AccountSecurityRepository:
+        description: "Data access layer for AccountSecurity entity operations"
+        priority: "normal"
+        interface_methods:
+          - name: "Create"
+            description: "Creates new account security record"
+            parameters:
+              - name: "security"
+                type: "AccountSecurity"
+            return_type: "AccountSecurity"
+            error_handling: "Returns error if creation fails"
+          - name: "GetByAccountID"
+            description: "Retrieves security record by account ID"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+            return_type: "AccountSecurity"
+            error_handling: "Returns error if not found"
+          - name: "Update"
+            description: "Updates existing security record"
+            parameters:
+              - name: "security"
+                type: "AccountSecurity"
+            return_type: "AccountSecurity"
+            error_handling: "Returns error if update fails"
+          - name: "UpdateFailedAttempts"
+            description: "Updates failed login attempts count"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+              - name: "attempts"
+                type: "integer"
+            return_type: "error"
+            error_handling: "Returns error if update fails"
+          - name: "UpdateLastLogin"
+            description: "Updates last login timestamp"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+              - name: "timestamp"
+                type: "Time"
+            return_type: "error"
+            error_handling: "Returns error if update fails"
+
+      EmailVerificationTokenRepository:
+        description: "Data access layer for EmailVerificationToken entity operations"
+        priority: "high"
+        interface_methods:
+          - name: "Create"
+            description: "Creates new verification token"
+            parameters:
+              - name: "token"
+                type: "EmailVerificationToken"
+            return_type: "EmailVerificationToken"
+            error_handling: "Returns error if creation fails"
+          - name: "GetByToken"
+            description: "Retrieves token by token value"
+            parameters:
+              - name: "token"
+                type: "string"
+            return_type: "EmailVerificationToken"
+            error_handling: "Returns error if not found"
+          - name: "GetByAccountID"
+            description: "Retrieves active token by account ID"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+            return_type: "EmailVerificationToken"
+            error_handling: "Returns error if not found"
+          - name: "MarkAsUsed"
+            description: "Marks token as used"
+            parameters:
+              - name: "token"
+                type: "string"
+              - name: "used_at"
+                type: "Time"
+            return_type: "error"
+            error_handling: "Returns error if update fails"
+          - name: "DeleteExpired"
+            description: "Deletes expired tokens"
+            parameters:
+              - name: "before_timestamp"
+                type: "Time"
+            return_type: "integer"
+            error_handling: "Returns count of deleted tokens"
+
+      PasswordResetTokenRepository:
+        description: "Data access layer for PasswordResetToken entity operations"
+        priority: "normal"
+        interface_methods:
+          - name: "Create"
+            description: "Creates new password reset token"
+            parameters:
+              - name: "token"
+                type: "PasswordResetToken"
+            return_type: "PasswordResetToken"
+            error_handling: "Returns error if creation fails"
+          - name: "GetByToken"
+            description: "Retrieves token by token value"
+            parameters:
+              - name: "token"
+                type: "string"
+            return_type: "PasswordResetToken"
+            error_handling: "Returns error if not found"
+          - name: "GetByAccountID"
+            description: "Retrieves active token by account ID"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+            return_type: "PasswordResetToken"
+            error_handling: "Returns error if not found"
+          - name: "MarkAsUsed"
+            description: "Marks token as used"
+            parameters:
+              - name: "token"
+                type: "string"
+              - name: "used_at"
+                type: "Time"
+            return_type: "error"
+            error_handling: "Returns error if update fails"
+          - name: "DeleteExpired"
+            description: "Deletes expired tokens"
+            parameters:
+              - name: "before_timestamp"
+                type: "Time"
+            return_type: "integer"
+            error_handling: "Returns count of deleted tokens"
+
+      SessionRepository:
+        description: "Data access layer for Session entity operations"
+        priority: "normal"
+        interface_methods:
+          - name: "Create"
+            description: "Creates new user session"
+            parameters:
+              - name: "session"
+                type: "Session"
+            return_type: "Session"
+            error_handling: "Returns error if creation fails"
+          - name: "GetByID"
+            description: "Retrieves session by ID"
+            parameters:
+              - name: "id"
+                type: "UUID"
+            return_type: "Session"
+            error_handling: "Returns error if not found"
+          - name: "GetByRefreshToken"
+            description: "Retrieves session by refresh token"
+            parameters:
+              - name: "refresh_token"
+                type: "string"
+            return_type: "Session"
+            error_handling: "Returns error if not found"
+          - name: "GetActiveByAccountID"
+            description: "Retrieves all active sessions for an account"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+            return_type: "[]Session"
+            error_handling: "Returns empty slice if none found"
+          - name: "UpdateLastActivity"
+            description: "Updates last activity timestamp"
+            parameters:
+              - name: "id"
+                type: "UUID"
+              - name: "timestamp"
+                type: "Time"
+            return_type: "error"
+            error_handling: "Returns error if update fails"
+          - name: "Terminate"
+            description: "Terminates a session"
+            parameters:
+              - name: "id"
+                type: "UUID"
+              - name: "reason"
+                type: "string"
+              - name: "terminated_at"
+                type: "Time"
+            return_type: "error"
+            error_handling: "Returns error if update fails"
+          - name: "TerminateAllByAccountID"
+            description: "Terminates all sessions for an account"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+              - name: "reason"
+                type: "string"
+              - name: "terminated_at"
+                type: "Time"
+            return_type: "integer"
+            error_handling: "Returns count of terminated sessions"
+          - name: "DeleteExpired"
+            description: "Deletes expired sessions"
+            parameters:
+              - name: "before_timestamp"
+                type: "Time"
+            return_type: "integer"
+            error_handling: "Returns count of deleted sessions"
+
+    # Events within this bounded context
+    events:
+      UserRegistered:
+        description: "Emitted when a new user account is successfully created."
+        user_journey: "User sees confirmation of registration."
+        user_value: "Confirms account creation and starts verification process."
+        payload_schema:
+          - field_name: "account_id"
+            type: "string"
+            description: "Unique identifier of the registered user"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          - field_name: "email"
+            type: "string"
+            description: "User's email address"
+            example: "user@example.com"
+          - field_name: "username"
+            type: "string"
+            description: "User's chosen username"
+            example: "johndoe"
+          - field_name: "created_at"
+            type: "integer"
+            description: "Timestamp when account was created"
+            example: 1700000000
+        published_by: "auth-service"
+        subscribed_clients:
+          - "notification-service"
+          - "audit-service"
+          - "analytics-service"
+        raising_conditions:
+          - "Account created successfully"
+
+      EmailVerificationTokenCreated:
+        description: "Emitted when a verification token is generated for email verification."
+        user_journey: "System prepares verification process."
+        user_value: "Enables secure email verification."
+        payload_schema:
+          - field_name: "account_id"
+            type: "string"
+            description: "Unique identifier of the user"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          - field_name: "token"
+            type: "string"
+            description: "Verification token"
+            example: "abc123def456"
+          - field_name: "expires_at"
+            type: "integer"
+            description: "Token expiration timestamp"
+            example: 1700086400
+        published_by: "auth-service"
+        subscribed_clients:
+          - "notification-service"
+          - "audit-service"
+        raising_conditions:
+          - "Verification token generated"
+
+      VerificationEmailSent:
+        description: "Emitted when a verification email is sent to a user."
+        user_journey: "User receives verification email."
+        user_value: "Provides the link to verify their account."
+        payload_schema:
+          - field_name: "account_id"
+            type: "string"
+            description: "Unique identifier of the registered user"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          - field_name: "verification_link"
+            type: "string"
+            description: "URL link to verify the account"
+            example: "https://example.com/verify?token=abcd1234"
+          - field_name: "email"
+            type: "string"
+            description: "User's email address"
+            example: "user@example.com"
+        published_by: "notification-service"
+        subscribed_clients:
+          - "auth-service"
+          - "audit-service"
+        raising_conditions:
+          - "Verification email sent successfully"
+
+      EmailVerified:
+        description: "Emitted when a user's email has been verified."
+        user_journey: "User can now log in to the system."
+        user_value: "Activates the account for full access."
+        payload_schema:
+          - field_name: "account_id"
+            type: "string"
+            description: "Unique identifier of the user"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          - field_name: "verified_at"
+            type: "integer"
+            description: "Timestamp when email was verified"
+            example: 1700000000
+        published_by: "auth-service"
+        subscribed_clients:
+          - "audit-service"
+          - "notification-service"
+          - "analytics-service"
+        raising_conditions:
+          - "Email verification completed successfully"
+
+      UserAuthenticated:
+        description: "Emitted when a user successfully logs in."
+        user_journey: "User gains access to their account."
+        user_value: "Grants session and access rights."
+        payload_schema:
+          - field_name: "account_id"
+            type: "string"
+            description: "Unique identifier of the authenticated user"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          - field_name: "session_id"
+            type: "string"
+            description: "ID of the active session"
+            example: "a8b3fcd2-64f3-44e7-b8b5-21d2eac9a8b3"
+          - field_name: "login_timestamp"
+            type: "integer"
+            description: "Timestamp of successful login"
+            example: 1700000000
+          - field_name: "ip_address"
+            type: "string"
+            description: "IP address of the login attempt"
+            example: "192.168.1.100"
+        published_by: "auth-service"
+        subscribed_clients:
+          - "audit-service"
+          - "notification-service"
+          - "analytics-service"
+        raising_conditions:
+          - "User authentication successful"
+
+      SessionCreated:
+        description: "Emitted when a new user session is created."
+        user_journey: "System establishes user session."
+        user_value: "Enables persistent user experience."
+        payload_schema:
+          - field_name: "session_id"
+            type: "string"
+            description: "Unique identifier of the session"
+            example: "a8b3fcd2-64f3-44e7-b8b5-21d2eac9a8b3"
+          - field_name: "account_id"
+            type: "string"
+            description: "Unique identifier of the user"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          - field_name: "created_at"
+            type: "integer"
+            description: "Timestamp when session was created"
+            example: 1700000000
+          - field_name: "expires_at"
+            type: "integer"
+            description: "Timestamp when session expires"
+            example: 1700086400
+        published_by: "auth-service"
+        subscribed_clients:
+          - "audit-service"
+          - "session-service"
+        raising_conditions:
+          - "New session created successfully"
+
+      LoginFailed:
+        description: "Emitted when a user login attempt fails."
+        user_journey: "System records failed authentication attempt."
+        user_value: "Helps prevent unauthorized access and provides security insights."
+        payload_schema:
+          - field_name: "account_id"
+            type: "string"
+            description: "Unique identifier of the user (if email exists)"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          - field_name: "email"
+            type: "string"
+            description: "Email address used in login attempt"
+            example: "user@example.com"
+          - field_name: "ip_address"
+            type: "string"
+            description: "IP address of the failed attempt"
+            example: "192.168.1.100"
+          - field_name: "failed_at"
+            type: "integer"
+            description: "Timestamp of failed attempt"
+            example: 1700000000
+          - field_name: "reason"
+            type: "string"
+            description: "Reason for failure"
+            example: "invalid_password"
+        published_by: "auth-service"
+        subscribed_clients:
+          - "audit-service"
+          - "security-service"
+          - "analytics-service"
+        raising_conditions:
+          - "Login attempt failed"
+
+      AccountLocked:
+        description: "Emitted when a user account is temporarily locked due to failed login attempts."
+        user_journey: "System protects account from brute force attacks."
+        user_value: "Enhances account security."
+        payload_schema:
+          - field_name: "account_id"
+            type: "string"
+            description: "Unique identifier of the locked user"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          - field_name: "locked_until"
+            type: "integer"
+            description: "Timestamp when account will be unlocked"
+            example: 1700086400
+          - field_name: "failed_attempts"
+            type: "integer"
+            description: "Number of failed attempts that triggered lockout"
+            example: 5
+          - field_name: "ip_address"
+            type: "string"
+            description: "IP address of the failed attempts"
+            example: "192.168.1.100"
+        published_by: "auth-service"
+        subscribed_clients:
+          - "audit-service"
+          - "security-service"
+          - "notification-service"
+        raising_conditions:
+          - "Account locked due to failed login attempts"
+
+      PasswordResetRequested:
+        description: "Emitted when a user requests a password reset."
+        user_journey: "User initiates password recovery process."
+        user_value: "Enables secure password recovery."
+        payload_schema:
+          - field_name: "account_id"
+            type: "string"
+            description: "Unique identifier of the user"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          - field_name: "email"
+            type: "string"
+            description: "User's email address"
+            example: "user@example.com"
+          - field_name: "requested_at"
+            type: "integer"
+            description: "Timestamp when reset was requested"
+            example: 1700000000
+          - field_name: "ip_address"
+            type: "string"
+            description: "IP address of the request"
+            example: "192.168.1.100"
+        published_by: "auth-service"
+        subscribed_clients:
+          - "notification-service"
+          - "audit-service"
+          - "security-service"
+        raising_conditions:
+          - "Password reset requested"
+
+      PasswordResetCompleted:
+        description: "Emitted when a user successfully completes password reset."
+        user_journey: "User gains access with new password."
+        user_value: "Confirms successful password recovery."
+        payload_schema:
+          - field_name: "account_id"
+            type: "string"
+            description: "Unique identifier of the user"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          - field_name: "reset_at"
+            type: "integer"
+            description: "Timestamp when password was reset"
+            example: 1700000000
+          - field_name: "ip_address"
+            type: "string"
+            description: "IP address where reset was completed"
+            example: "192.168.1.100"
+        published_by: "auth-service"
+        subscribed_clients:
+          - "audit-service"
+          - "security-service"
+          - "notification-service"
+        raising_conditions:
+          - "Password reset completed successfully"
+
+      AccountSecurityCreated:
+        description: "Emitted when a new AccountSecurity record is created for a user."
+        user_journey: "System establishes security monitoring for new account."
+        user_value: "Enables account protection and security features."
+        payload_schema:
+          - field_name: "account_id"
+            type: "string"
+            description: "Unique identifier of the user"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          - field_name: "created_at"
+            type: "integer"
+            description: "Timestamp when security record was created"
+            example: 1700000000
+        published_by: "auth-service"
+        subscribed_clients:
+          - "audit-service"
+          - "security-service"
+        raising_conditions:
+          - "AccountSecurity record created successfully"
+
+      UserLoggedOut:
+        description: "Emitted when a user successfully logs out from a single session."
+        user_journey: "User session is terminated and user is redirected to login."
+        user_value: "Confirms successful session termination and provides security assurance."
+        payload_schema:
+          - field_name: "account_id"
+            type: "string"
+            description: "Unique identifier of the user"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          - field_name: "session_id"
+            type: "string"
+            description: "ID of the terminated session"
+            example: "a8b3fcd2-64f3-44e7-b8b5-21d2eac9a8b3"
+          - field_name: "logout_timestamp"
+            type: "integer"
+            description: "Timestamp when logout occurred"
+            example: 1700000000
+          - field_name: "ip_address"
+            type: "string"
+            description: "IP address where logout occurred"
+            example: "192.168.1.100"
+          - field_name: "logout_reason"
+            type: "string"
+            description: "Reason for logout (user_initiated, session_expired, etc.)"
+            example: "user_initiated"
+        published_by: "auth-service"
+        subscribed_clients:
+          - "audit-service"
+          - "session-service"
+          - "analytics-service"
+        raising_conditions:
+          - "User logout successful"
+
+      SessionTerminated:
+        description: "Emitted when a user session is terminated (logout, timeout, or security action)."
+        user_journey: "System terminates user session and logs the action."
+        user_value: "Provides audit trail for session management and security monitoring."
+        payload_schema:
+          - field_name: "session_id"
+            type: "string"
+            description: "Unique identifier of the terminated session"
+            example: "a8b3fcd2-64f3-44e7-b8b5-21d2eac9a8b3"
+          - field_name: "account_id"
+            type: "string"
+            description: "Unique identifier of the user"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          - field_name: "terminated_at"
+            type: "integer"
+            description: "Timestamp when session was terminated"
+            example: 1700000000
+          - field_name: "termination_reason"
+            type: "string"
+            description: "Reason for session termination"
+            example: "user_logout"
+          - field_name: "ip_address"
+            type: "string"
+            description: "IP address where termination occurred"
+            example: "192.168.1.100"
+        published_by: "auth-service"
+        subscribed_clients:
+          - "audit-service"
+          - "session-service"
+          - "security-service"
+        raising_conditions:
+          - "Session terminated successfully"
+
+      UserLoggedOutAll:
+        description: "Emitted when a user successfully logs out from all active sessions across all devices."
+        user_journey: "All user sessions are terminated and user is notified of successful logout from all devices."
+        user_value: "Confirms successful termination of all sessions and provides security control."
+        payload_schema:
+          - field_name: "account_id"
+            type: "string"
+            description: "Unique identifier of the user"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          - field_name: "sessions_terminated"
+            type: "integer"
+            description: "Number of sessions that were terminated"
+            example: 3
+          - field_name: "logout_timestamp"
+            type: "integer"
+            description: "Timestamp when logout from all devices occurred"
+            example: 1700000000
+          - field_name: "ip_address"
+            type: "string"
+            description: "IP address where logout from all devices was initiated"
+            example: "192.168.1.100"
+          - field_name: "logout_reason"
+            type: "string"
+            description: "Reason for logout from all devices"
+            example: "security_concern"
+        published_by: "auth-service"
+        subscribed_clients:
+          - "audit-service"
+          - "session-service"
+          - "security-service"
+          - "notification-service"
+        raising_conditions:
+          - "User logout from all devices successful"
+
+      AllSessionsTerminated:
+        description: "Emitted when all active sessions for a user are terminated simultaneously."
+        user_journey: "System terminates multiple sessions and logs the bulk action."
+        user_value: "Provides comprehensive audit trail for bulk session termination."
+        payload_schema:
+          - field_name: "account_id"
+            type: "string"
+            description: "Unique identifier of the user"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          - field_name: "session_ids"
+            type: "array"
+            description: "List of terminated session IDs"
+            example: ["a8b3fcd2-64f3-44e7-b8b5-21d2eac9a8b3", "b9c4gde3-75g4-55f8-c9c6-32e3fbd0b9c4"]
+          - field_name: "terminated_at"
+            type: "integer"
+            description: "Timestamp when all sessions were terminated"
+            example: 1700000000
+          - field_name: "termination_reason"
+            type: "string"
+            description: "Reason for bulk session termination"
+            example: "logout_all_devices"
+          - field_name: "initiating_ip"
+            type: "string"
+            description: "IP address where termination was initiated"
+            example: "192.168.1.100"
+        published_by: "auth-service"
+        subscribed_clients:
+          - "audit-service"
+          - "session-service"
+          - "security-service"
+        raising_conditions:
+          - "All sessions terminated successfully"
+
+      SecurityAlert:
+        description: "Emitted when a security-related action occurs that requires attention."
+        user_journey: "System detects security event and triggers alert for monitoring."
+        user_value: "Enables proactive security monitoring and threat detection."
+        payload_schema:
+          - field_name: "account_id"
+            type: "string"
+            description: "Unique identifier of the user"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          - field_name: "alert_type"
+            type: "string"
+            description: "Type of security alert"
+            example: "logout_all_devices"
+          - field_name: "alert_severity"
+            type: "string"
+            description: "Severity level of the alert (low, medium, high, critical)"
+            example: "medium"
+          - field_name: "alert_timestamp"
+            type: "integer"
+            description: "Timestamp when alert was generated"
+            example: 1700000000
+          - field_name: "ip_address"
+            type: "string"
+            description: "IP address associated with the security event"
+            example: "192.168.1.100"
+          - field_name: "description"
+            type: "string"
+            description: "Detailed description of the security event"
+            example: "User initiated logout from all devices due to security concern"
+        published_by: "auth-service"
+        subscribed_clients:
+          - "audit-service"
+          - "security-service"
+          - "notification-service"
+        raising_conditions:
+          - "Security event detected and alert generated"
+
+    # Delivery layer within this bounded context
+    delivery:
+      description: "HTTP API endpoints and request/response handling for authentication operations"
+      base_path: "/authn/v1"
+      controllers:
+        AuthController:
+          description: "Handles authentication-related HTTP requests and responses"
+          endpoints:
+            # User Registration
+            - path: "/register"
+              method: "POST"
+              description: "Register a new user account"
+              request_body:
+                type: "object"
+                required: ["email", "password", "username"]
+                properties:
+                  email:
+                    type: "string"
+                    format: "email"
+                    description: "User's email address"
+                    example: "user@example.com"
+                  password:
+                    type: "string"
+                    minLength: 8
+                    description: "User's password"
+                    example: "SecurePass123"
+                  username:
+                    type: "string"
+                    minLength: 3
+                    maxLength: 20
+                    pattern: "^[a-zA-Z0-9_]+$"
+                    description: "User's chosen username"
+                    example: "johndoe"
+                  full_name:
+                    type: "string"
+                    maxLength: 255
+                    description: "User's full name (optional)"
+                    example: "John Doe"
+              responses:
+                201:
+                  description: "Account created successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      message:
+                        type: "string"
+                        example: "Account created successfully. Please check your email for verification."
+                      account_id:
+                        type: "string"
+                        format: "uuid"
+                        example: "550e8400-e29b-41d4-a716-446655440000"
+                400:
+                  description: "Bad request - validation errors"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Validation failed"
+                      details:
+                        type: "array"
+                        items:
+                          type: "object"
+                          properties:
+                            field:
+                              type: "string"
+                            message:
+                              type: "string"
+                409:
+                  description: "Conflict - email or username already exists"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Email already registered"
+
+            # Email Verification
+            - path: "/verify-email"
+              method: "POST"
+              description: "Verify user's email address using verification token"
+              request_body:
+                type: "object"
+                required: ["token"]
+                properties:
+                  token:
+                    type: "string"
+                    description: "Email verification token"
+                    example: "abc123def456"
+              responses:
+                200:
+                  description: "Email verified successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      message:
+                        type: "string"
+                        example: "Email verified successfully. You can now log in."
+                      account_id:
+                        type: "string"
+                        format: "uuid"
+                        example: "550e8400-e29b-41d4-a716-446655440000"
+                400:
+                  description: "Invalid or expired token"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Invalid or expired verification token"
+
+            # User Login
+            - path: "/login"
+              method: "POST"
+              description: "Authenticate user and create session"
+              request_body:
+                type: "object"
+                required: ["email", "password"]
+                properties:
+                  email:
+                    type: "string"
+                    format: "email"
+                    description: "User's email address"
+                    example: "user@example.com"
+                  password:
+                    type: "string"
+                    description: "User's password"
+                    example: "SecurePass123"
+              responses:
+                200:
+                  description: "Login successful"
+                  body:
+                    type: "object"
+                    properties:
+                      message:
+                        type: "string"
+                        example: "Login successful"
+                      access_token:
+                        type: "string"
+                        description: "JWT access token"
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      refresh_token:
+                        type: "string"
+                        description: "Refresh token for getting new access tokens"
+                        example: "refresh_token_123"
+                      expires_in:
+                        type: "integer"
+                        description: "Access token expiration time in seconds"
+                        example: 21600
+                      user:
+                        type: "object"
+                        properties:
+                          id:
+                            type: "string"
+                            format: "uuid"
+                          email:
+                            type: "string"
+                          username:
+                            type: "string"
+                          full_name:
+                            type: "string"
+                          status:
+                            type: "string"
+                401:
+                  description: "Authentication failed"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Invalid credentials"
+                423:
+                  description: "Account locked"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Account temporarily locked due to failed attempts"
+                      locked_until:
+                        type: "integer"
+                        description: "Timestamp when account will be unlocked"
+
+            # Password Reset Request
+            - path: "/forgot-password"
+              method: "POST"
+              description: "Request password reset token"
+              request_body:
+                type: "object"
+                required: ["email"]
+                properties:
+                  email:
+                    type: "string"
+                    format: "email"
+                    description: "User's email address"
+                    example: "user@example.com"
+              responses:
+                200:
+                  description: "Password reset email sent"
+                  body:
+                    type: "object"
+                    properties:
+                      message:
+                        type: "string"
+                        example: "If an account with this email exists, a password reset link has been sent."
+                400:
+                  description: "Invalid email format"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Invalid email format"
+
+            # Password Reset
+            - path: "/reset-password"
+              method: "POST"
+              description: "Reset password using reset token"
+              request_body:
+                type: "object"
+                required: ["token", "new_password"]
+                properties:
+                  token:
+                    type: "string"
+                    description: "Password reset token"
+                    example: "reset_token_123"
+                  new_password:
+                    type: "string"
+                    minLength: 8
+                    description: "New password"
+                    example: "NewSecurePass123"
+              responses:
+                200:
+                  description: "Password reset successful"
+                  body:
+                    type: "object"
+                    properties:
+                      message:
+                        type: "string"
+                        example: "Password reset successful. You can now log in with your new password."
+                400:
+                  description: "Invalid or expired token"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Invalid or expired reset token"
+
+            # User Logout
+            - path: "/logout"
+              method: "POST"
+              description: "Logout from current session"
+              security:
+                - bearerAuth: []
+              request_body:
+                type: "object"
+                properties:
+                  refresh_token:
+                    type: "string"
+                    description: "Refresh token to invalidate (optional)"
+                    example: "refresh_token_123"
+              responses:
+                200:
+                  description: "Logout successful"
+                  body:
+                    type: "object"
+                    properties:
+                      message:
+                        type: "string"
+                        example: "Logout successful"
+                401:
+                  description: "Unauthorized - invalid or missing token"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            # Logout from All Devices
+            - path: "/logout-all"
+              method: "POST"
+              description: "Logout from all active sessions across all devices"
+              security:
+                - bearerAuth: []
+              responses:
+                200:
+                  description: "Logout from all devices successful"
+                  body:
+                    type: "object"
+                    properties:
+                      message:
+                        type: "string"
+                        example: "Successfully logged out from all devices"
+                      sessions_terminated:
+                        type: "integer"
+                        description: "Number of sessions terminated"
+                        example: 3
+                401:
+                  description: "Unauthorized - invalid or missing token"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            # Refresh Token
+            - path: "/refresh"
+              method: "POST"
+              description: "Get new access token using refresh token"
+              request_body:
+                type: "object"
+                required: ["refresh_token"]
+                properties:
+                  refresh_token:
+                    type: "string"
+                    description: "Valid refresh token"
+                    example: "refresh_token_123"
+              responses:
+                200:
+                  description: "Token refreshed successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      access_token:
+                        type: "string"
+                        description: "New JWT access token"
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      expires_in:
+                        type: "integer"
+                        description: "Access token expiration time in seconds"
+                        example: 21600
+                401:
+                  description: "Invalid or expired refresh token"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Invalid or expired refresh token"
+
+            # Get Current User
+            - path: "/me"
+              method: "GET"
+              description: "Get current authenticated user information"
+              security:
+                - bearerAuth: []
+              responses:
+                200:
+                  description: "User information retrieved successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      user:
+                        type: "object"
+                        properties:
+                          id:
+                            type: "string"
+                            format: "uuid"
+                          email:
+                            type: "string"
+                          username:
+                            type: "string"
+                          full_name:
+                            type: "string"
+                          status:
+                            type: "string"
+                          is_email_verified:
+                            type: "boolean"
+                          created_at:
+                            type: "integer"
+                401:
+                  description: "Unauthorized - invalid or missing token"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            # Resend Verification Email
+            - path: "/resend-verification"
+              method: "POST"
+              description: "Resend email verification token"
+              request_body:
+                type: "object"
+                required: ["email"]
+                properties:
+                  email:
+                    type: "string"
+                    format: "email"
+                    description: "User's email address"
+                    example: "user@example.com"
+              responses:
+                200:
+                  description: "Verification email sent"
+                  body:
+                    type: "object"
+                    properties:
+                      message:
+                        type: "string"
+                        example: "Verification email sent successfully"
+                400:
+                  description: "Invalid email format"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Invalid email format"
+                404:
+                  description: "Account not found"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Account not found"
+
+      # API Documentation
+      api_documentation:
+        openapi_version: "3.0.3"
+        info:
+          title: "User Authentication API"
+          description: "API for user authentication, registration, and account management"
+          version: "1.0.0"
+          contact:
+            name: "API Support"
+            email: "support@example.com"
+        servers:
+          - url: "https://api.example.com"
+            description: "Production server"
+          - url: "https://staging-api.example.com"
+            description: "Staging server"
+        components:
+          securitySchemes:
+            bearerAuth:
+              type: "http"
+              scheme: "bearer"
+              bearerFormat: "JWT"
+          schemas:
+            Error:
+              type: "object"
+              properties:
+                error:
+                  type: "string"
+                  description: "Error message"
+                details:
+                  type: "array"
+                  items:
+                    type: "object"
+                    properties:
+                      field:
+                        type: "string"
+                      message:
+                        type: "string"
+        tags:
+          - name: "Authentication"
+            description: "User authentication and account management endpoints"
+
+    # Aggregates within this bounded context
+    aggregates:
+      AccountAggregate:
+        root_entity: "Account"
+        description: "Encapsulates the Account entity and related behaviors, including verification token generation, account security management, and session management."
+        invariants:
+          - "Account entity invariants must always hold"
+          - "AccountSecurity entity must exist with id equal to Account id"
+          - "Email verification token must belong to the aggregate's account"
+          - "Password reset tokens must belong to the aggregate's account"
+          - "All tokens must have valid expiration dates"
+          - "Security-related operations must maintain consistency between Account and AccountSecurity"
+          - "Session entities must belong to the aggregate's account"
+          - "Session lifecycle must be properly managed (creation, updates, termination)"
+
+    # Use cases within this bounded context
+    use_cases:
+      UserRegistration:
+        description: "User creates an account with email and password."
+        user_journey: |
+          User fills out the registration form, submits details, receives a
+          verification email, and confirms their account by clicking the link.
+        user_value: |
+          Allows the user to have a secure personal account with access to
+          personalized features and services.
+        primary_actors:
+          - "User"
+        entities_involved:
+          - "Account"
+          - "EmailVerificationToken"
+          - "AccountSecurity"
+        aggregates_involved:
+          - "AccountAggregate"
+        value_objects_involved:
+          - "Email"
+          - "Password"
+        preconditions:
+          - "User email is not already registered"
+          - "Username is not already taken"
+        initiation_triggers:
+          - "User clicks 'Sign Up' button"
+        steps:
+          main_flow:
+            - step: 1
+              action: "User enters registration details (email, password, optional profile info)"
+            - step: 2
+              action: "System validates input"
+            - step: 3
+              action: "System stores user account in database"
+            - step: 4
+              action: "System creates AccountSecurity record with same id as user"
+            - step: 5
+              action: "System sends verification email to the user"
+          alternative_flows:
+            - name: "EmailAlreadyRegistered"
+              conditions:
+                - "Email exists in database"
+              steps:
+                - step: 1
+                  action: "System notifies user that the email is already taken"
+            - name: "UsernameAlreadyTaken"
+              conditions:
+                - "Username exists in database"
+              steps:
+                - step: 1
+                  action: "System notifies user that the username is already taken"
+            - name: "InvalidInput"
+              conditions:
+                - "Input validation fails"
+              steps:
+                - step: 1
+                  action: "System returns validation errors to user"
+        events_emitted:
+          - "UserRegistered"
+          - "VerificationEmailSent"
+          - "AccountSecurityCreated"
+        business_rules:
+          - "Email must be unique"
+          - "Username must be unique"
+          - "Password must meet security requirements"
+        validation_rules:
+          - "Email format validation"
+          - "Password strength validation"
+          - "Username format validation (alphanumeric, 3-20 characters)"
+
+      EmailVerification:
+        description: "User verifies their email address via a unique token."
+        user_journey: "User clicks verification link, system validates token, and activates account."
+        user_value: "Activates the account to allow login and feature access."
+        primary_actors:
+          - "User"
+        entities_involved:
+          - "Account"
+          - "EmailVerificationToken"
+          - "AccountSecurity"
+        aggregates_involved:
+          - "AccountAggregate"
+        preconditions:
+          - "User has a pending status"
+          - "Valid verification token exists"
+        initiation_triggers:
+          - "User clicks verification link in email"
+        steps:
+          main_flow:
+            - step: 1
+              action: "System validates verification token"
+            - step: 2
+              action: "System marks email as verified"
+            - step: 3
+              action: "System updates user status to ACTIVE"
+            - step: 4
+              action: "System marks token as used"
+          alternative_flows:
+            - name: "TokenExpired"
+              conditions:
+                - "Token has expired"
+              steps:
+                - step: 1
+                  action: "System notifies user that token is expired"
+                - step: 2
+                  action: "System offers to resend verification email"
+            - name: "TokenAlreadyUsed"
+              conditions:
+                - "Token has already been used"
+              steps:
+                - step: 1
+                  action: "System notifies user that token is invalid"
+        events_emitted:
+          - "EmailVerified"
+        business_rules:
+          - "Token must not be expired"
+          - "Token must match user"
+          - "Token can only be used once"
+
+      UserLogin:
+        description: "User logs in with email and password."
+        user_journey: "User enters credentials, system authenticates and issues a session token."
+        user_value: "Grants secure access to the system's features."
+        primary_actors:
+          - "User"
+        entities_involved:
+          - "Account"
+          - "AccountSecurity"
+          - "Session"
+        aggregates_involved:
+          - "AccountAggregate"
+        value_objects_involved:
+          - "Email"
+          - "Password"
+        preconditions:
+          - "User account is ACTIVE"
+          - "User account is not locked"
+        initiation_triggers:
+          - "User clicks 'Login' button"
+        steps:
+          main_flow:
+            - step: 1
+              action: "System validates credentials"
+            - step: 2
+              action: "System issues authentication token"
+            - step: 3
+              action: "System updates last login timestamp"
+            - step: 4
+              action: "System resets failed login attempts"
+          alternative_flows:
+            - name: "InvalidCredentials"
+              conditions:
+                - "Email or password is incorrect"
+              steps:
+                - step: 1
+                  action: "System increments failed login attempts"
+                - step: 2
+                  action: "System checks if account should be locked"
+                - step: 3
+                  action: "System returns authentication error"
+            - name: "AccountLocked"
+              conditions:
+                - "Account is temporarily locked due to failed attempts"
+              steps:
+                - step: 1
+                  action: "System notifies user of lockout period"
+            - name: "AccountSuspended"
+              conditions:
+                - "Account status is SUSPENDED"
+              steps:
+                - step: 1
+                  action: "System notifies user to contact support"
+        events_emitted:
+          - "UserAuthenticated"
+          - "SessionCreated"
+          - "LoginFailed"
+          - "AccountLocked"
+        business_rules:
+          - "Max login attempts per IP"
+          - "Password must be hashed and compared securely"
+          - "Account lockout after 5 failed attempts for 15 minutes"
+
+      PasswordReset:
+        description: "User requests and completes password reset via email."
+        user_journey: "User requests password reset, receives email, sets new password."
+        user_value: "Allows secure recovery of account access when password is forgotten."
+        primary_actors:
+          - "User"
+        entities_involved:
+          - "Account"
+          - "PasswordResetToken"
+          - "AccountSecurity"
+        aggregates_involved:
+          - "AccountAggregate"
+        value_objects_involved:
+          - "Email"
+          - "Password"
+        preconditions:
+          - "User account exists and is ACTIVE"
+        initiation_triggers:
+          - "User clicks 'Forgot Password' link"
+        steps:
+          main_flow:
+            - step: 1
+              action: "User enters email address"
+            - step: 2
+              action: "System generates password reset token"
+            - step: 3
+              action: "System sends password reset email"
+            - step: 4
+              action: "User clicks reset link and sets new password"
+            - step: 5
+              action: "System validates token and updates password"
+            - step: 6
+              action: "System updates password_changed_at in AccountSecurity"
+          alternative_flows:
+            - name: "EmailNotFound"
+              conditions:
+                - "Email address not found in system"
+              steps:
+                - step: 1
+                  action: "System shows generic success message (security)"
+            - name: "TokenExpired"
+              conditions:
+                - "Reset token has expired"
+              steps:
+                - step: 1
+                  action: "System offers to generate new token"
+        events_emitted:
+          - "PasswordResetRequested"
+          - "PasswordResetCompleted"
+        business_rules:
+          - "Reset tokens expire after 1 hour"
+          - "New password must meet security requirements"
+          - "Old password cannot be reused"
+
+      UserLogout:
+        description: "User logs out from current session, invalidating the active session token."
+        user_journey: "User clicks logout, system invalidates current session and redirects to login page."
+        user_value: "Provides secure way to end user session and protect account from unauthorized access."
+        primary_actors:
+          - "User"
+        entities_involved:
+          - "Account"
+          - "AccountSecurity"
+          - "Session"
+        aggregates_involved:
+          - "AccountAggregate"
+        preconditions:
+          - "User is authenticated"
+          - "User has an active session"
+        initiation_triggers:
+          - "User clicks 'Logout' button"
+          - "Session timeout"
+        steps:
+          main_flow:
+            - step: 1
+              action: "User initiates logout action"
+            - step: 2
+              action: "System validates current session token"
+            - step: 3
+              action: "System invalidates current session token"
+            - step: 4
+              action: "System clears client-side session data"
+            - step: 5
+              action: "System redirects user to login page"
+          alternative_flows:
+            - name: "SessionAlreadyExpired"
+              conditions:
+                - "Session token has already expired"
+              steps:
+                - step: 1
+                  action: "System clears any remaining session data"
+                - step: 2
+                  action: "System redirects user to login page"
+            - name: "InvalidSession"
+              conditions:
+                - "Session token is invalid or corrupted"
+              steps:
+                - step: 1
+                  action: "System clears session data"
+                - step: 2
+                  action: "System redirects user to login page with error message"
+        events_emitted:
+          - "UserLoggedOut"
+          - "SessionTerminated"
+        business_rules:
+          - "Session token must be immediately invalidated"
+          - "Client-side session data must be cleared"
+          - "User must be redirected to login page"
+          - "Logout action must be logged for audit purposes"
+
+      UserLogoutAll:
+        description: "User logs out from all active sessions across all devices, invalidating all session tokens."
+        user_journey: "User requests logout from all devices, system invalidates all active sessions and notifies user."
+        user_value: "Provides security control to terminate all active sessions when account security is compromised."
+        primary_actors:
+          - "User"
+        entities_involved:
+          - "Account"
+          - "AccountSecurity"
+          - "Session"
+        aggregates_involved:
+          - "AccountAggregate"
+        preconditions:
+          - "User is authenticated"
+          - "User has at least one active session"
+        initiation_triggers:
+          - "User clicks 'Logout from All Devices' button"
+          - "User suspects account compromise"
+          - "Password change request"
+        steps:
+          main_flow:
+            - step: 1
+              action: "User initiates logout from all devices action"
+            - step: 2
+              action: "System validates current session token"
+            - step: 3
+              action: "System identifies all active sessions for the user"
+            - step: 4
+              action: "System invalidates all active session tokens"
+            - step: 5
+              action: "System clears client-side session data"
+            - step: 6
+              action: "System notifies user of successful logout from all devices"
+            - step: 7
+              action: "System redirects user to login page"
+          alternative_flows:
+            - name: "NoActiveSessions"
+              conditions:
+                - "User has no active sessions"
+              steps:
+                - step: 1
+                  action: "System notifies user that no active sessions exist"
+                - step: 2
+                  action: "System redirects user to dashboard"
+            - name: "SessionTerminationFailed"
+              conditions:
+                - "Some sessions could not be terminated"
+              steps:
+                - step: 1
+                  action: "System logs error for failed session terminations"
+                - step: 2
+                  action: "System notifies user of partial success"
+                - step: 3
+                  action: "System redirects user to login page"
+        events_emitted:
+          - "UserLoggedOutAll"
+          - "AllSessionsTerminated"
+          - "SecurityAlert"
+        business_rules:
+          - "All active session tokens must be immediately invalidated"
+          - "Client-side session data must be cleared"
+          - "User must be notified of successful logout from all devices"
+          - "Security alert must be triggered for audit purposes"
+          - "User must be redirected to login page"
+          - "Failed session terminations must be logged"
+
+  authorization:
+    description: "Manages user permissions, roles, and access control"
+    domain: "User"
+    responsibilities:
+      - "Role-based access control (RBAC)"
+      - "Permission management"
+      - "Resource access validation"
+      - "Policy enforcement"
+    external_dependencies:
+      - "resource-service: for resource definitions"
+      - "audit-service: for logging access events"
+      - "policy-service: for policy management"
+    
+    # Entities, use cases, and events for authorization will be added here
+    entities: {}
+    use_cases: {}
+    events: {}
+    
+    # Repository layer for authorization
+    repositories:
+      RoleRepository:
+        description: "Data access layer for Role entity operations"
+        interface_methods:
+          - name: "Create"
+            description: "Creates a new role"
+            parameters:
+              - name: "role"
+                type: "Role"
+            return_type: "Role"
+            error_handling: "Returns error if role name already exists"
+          - name: "GetByID"
+            description: "Retrieves role by ID"
+            parameters:
+              - name: "id"
+                type: "UUID"
+            return_type: "Role"
+            error_handling: "Returns error if role not found"
+          - name: "GetByName"
+            description: "Retrieves role by name"
+            parameters:
+              - name: "name"
+                type: "string"
+            return_type: "Role"
+            error_handling: "Returns error if role not found"
+          - name: "GetAll"
+            description: "Retrieves all roles"
+            return_type: "[]Role"
+            error_handling: "Returns empty slice if no roles found"
+          - name: "Update"
+            description: "Updates existing role"
+            parameters:
+              - name: "role"
+                type: "Role"
+            return_type: "Role"
+            error_handling: "Returns error if update fails"
+          - name: "Delete"
+            description: "Deletes role"
+            parameters:
+              - name: "id"
+                type: "UUID"
+            return_type: "error"
+            error_handling: "Returns error if deletion fails"
+
+      PermissionRepository:
+        description: "Data access layer for Permission entity operations"
+        interface_methods:
+          - name: "Create"
+            description: "Creates a new permission"
+            parameters:
+              - name: "permission"
+                type: "Permission"
+            return_type: "Permission"
+            error_handling: "Returns error if permission already exists"
+          - name: "GetByID"
+            description: "Retrieves permission by ID"
+            parameters:
+              - name: "id"
+                type: "UUID"
+            return_type: "Permission"
+            error_handling: "Returns error if permission not found"
+          - name: "GetByResource"
+            description: "Retrieves permissions by resource"
+            parameters:
+              - name: "resource"
+                type: "string"
+            return_type: "[]Permission"
+            error_handling: "Returns empty slice if no permissions found"
+          - name: "GetByRoleID"
+            description: "Retrieves permissions by role ID"
+            parameters:
+              - name: "role_id"
+                type: "UUID"
+            return_type: "[]Permission"
+            error_handling: "Returns empty slice if no permissions found"
+
+    # Delivery layer for authorization
+    delivery:
+      description: "HTTP API endpoints for authorization operations"
+      base_path: "/authz/v1"
+      controllers:
+        AuthorizationController:
+          description: "Handles authorization-related HTTP requests and responses"
+          endpoints:
+            - path: "/roles"
+              method: "GET"
+              description: "Get all available roles"
+              security:
+                - bearerAuth: []
+              responses:
+                200:
+                  description: "Roles retrieved successfully"
+                  body:
+                    type: "array"
+                    items:
+                      type: "object"
+                      properties:
+                        id:
+                          type: "string"
+                          format: "uuid"
+                        name:
+                          type: "string"
+                        description:
+                          type: "string"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            - path: "/permissions"
+              method: "GET"
+              description: "Get permissions for a specific role"
+              security:
+                - bearerAuth: []
+              parameters:
+                - name: "role_id"
+                  in: "query"
+                  required: true
+                  schema:
+                    type: "string"
+                    format: "uuid"
+              responses:
+                200:
+                  description: "Permissions retrieved successfully"
+                  body:
+                    type: "array"
+                    items:
+                      type: "object"
+                      properties:
+                        id:
+                          type: "string"
+                          format: "uuid"
+                        resource:
+                          type: "string"
+                        action:
+                          type: "string"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            - path: "/check"
+              method: "POST"
+              description: "Check if user has permission for a specific resource and action"
+              security:
+                - bearerAuth: []
+              request_body:
+                type: "object"
+                required: ["resource", "action"]
+                properties:
+                  resource:
+                    type: "string"
+                    description: "Resource to check permission for"
+                    example: "user:profile"
+                  action:
+                    type: "string"
+                    description: "Action to check permission for"
+                    example: "read"
+              responses:
+                200:
+                  description: "Permission check completed"
+                  body:
+                    type: "object"
+                    properties:
+                      allowed:
+                        type: "boolean"
+                        description: "Whether the user has permission"
+                        example: true
+                      reason:
+                        type: "string"
+                        description: "Reason for the decision"
+                        example: "User has admin role"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+  profile_management:
+    description: "Handles user profile data, preferences, and personal information"
+    domain: "User"
+    responsibilities:
+      - "Profile information management"
+      - "User preferences and settings"
+      - "Avatar and media management"
+      - "Privacy settings"
+    external_dependencies:
+      - "media-service: for file uploads"
+      - "notification-service: for preference updates"
+      - "analytics-service: for user behavior"
+    
+    # Entities, use cases, and events for profile management will be added here
+    entities: {}
+    use_cases: {}
+    events: {}
+    
+    # Repository layer for profile management
+    repositories:
+      ProfileRepository:
+        description: "Data access layer for Profile entity operations"
+        interface_methods:
+          - name: "GetByAccountID"
+            description: "Retrieves profile by account ID"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+            return_type: "Profile"
+            error_handling: "Returns error if profile not found"
+          - name: "Update"
+            description: "Updates existing profile"
+            parameters:
+              - name: "profile"
+                type: "Profile"
+            return_type: "Profile"
+            error_handling: "Returns error if update fails"
+          - name: "UpdateAvatar"
+            description: "Updates profile avatar"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+              - name: "avatar_url"
+                type: "string"
+            return_type: "error"
+            error_handling: "Returns error if update fails"
+
+      PreferenceRepository:
+        description: "Data access layer for UserPreference entity operations"
+        interface_methods:
+          - name: "GetByAccountID"
+            description: "Retrieves preferences by account ID"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+            return_type: "[]UserPreference"
+            error_handling: "Returns empty slice if no preferences found"
+          - name: "Update"
+            description: "Updates user preference"
+            parameters:
+              - name: "preference"
+                type: "UserPreference"
+            return_type: "UserPreference"
+            error_handling: "Returns error if update fails"
+          - name: "SetDefault"
+            description: "Sets default preferences for new user"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+            return_type: "error"
+            error_handling: "Returns error if creation fails"
+
+    # Delivery layer for profile management
+    delivery:
+      description: "HTTP API endpoints for profile management operations"
+      base_path: "/profile/v1"
+      controllers:
+        ProfileController:
+          description: "Handles profile-related HTTP requests and responses"
+          endpoints:
+            - path: "/me"
+              method: "GET"
+              description: "Get current user's profile"
+              security:
+                - bearerAuth: []
+              responses:
+                200:
+                  description: "Profile retrieved successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      id:
+                        type: "string"
+                        format: "uuid"
+                      account_id:
+                        type: "string"
+                        format: "uuid"
+                      full_name:
+                        type: "string"
+                      bio:
+                        type: "string"
+                      avatar_url:
+                        type: "string"
+                      location:
+                        type: "string"
+                      website:
+                        type: "string"
+                      updated_at:
+                        type: "integer"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            - path: "/me"
+              method: "PUT"
+              description: "Update current user's profile"
+              security:
+                - bearerAuth: []
+              request_body:
+                type: "object"
+                properties:
+                  full_name:
+                    type: "string"
+                    maxLength: 255
+                    description: "User's full name"
+                    example: "John Doe"
+                  bio:
+                    type: "string"
+                    maxLength: 1000
+                    description: "User's biography"
+                    example: "Software engineer passionate about technology"
+                  location:
+                    type: "string"
+                    maxLength: 255
+                    description: "User's location"
+                    example: "San Francisco, CA"
+                  website:
+                    type: "string"
+                    format: "uri"
+                    description: "User's website"
+                    example: "https://johndoe.com"
+              responses:
+                200:
+                  description: "Profile updated successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      message:
+                        type: "string"
+                        example: "Profile updated successfully"
+                      profile:
+                        type: "object"
+                        properties:
+                          id:
+                            type: "string"
+                            format: "uuid"
+                          updated_at:
+                            type: "integer"
+                400:
+                  description: "Bad request - validation errors"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Validation failed"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            - path: "/avatar"
+              method: "POST"
+              description: "Upload user avatar"
+              security:
+                - bearerAuth: []
+              request_body:
+                type: "object"
+                required: ["avatar"]
+                properties:
+                  avatar:
+                    type: "string"
+                    format: "binary"
+                    description: "Avatar image file"
+              responses:
+                200:
+                  description: "Avatar uploaded successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      message:
+                        type: "string"
+                        example: "Avatar uploaded successfully"
+                      avatar_url:
+                        type: "string"
+                        description: "URL of uploaded avatar"
+                        example: "https://cdn.example.com/avatars/user123.jpg"
+                400:
+                  description: "Bad request - invalid file"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Invalid file format"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            - path: "/preferences"
+              method: "GET"
+              description: "Get user preferences"
+              security:
+                - bearerAuth: []
+              responses:
+                200:
+                  description: "Preferences retrieved successfully"
+                  body:
+                    type: "array"
+                    items:
+                      type: "object"
+                      properties:
+                        id:
+                          type: "string"
+                          format: "uuid"
+                        key:
+                          type: "string"
+                          example: "email_notifications"
+                        value:
+                          type: "string"
+                          example: "true"
+                        description:
+                          type: "string"
+                          example: "Receive email notifications"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            - path: "/preferences"
+              method: "PUT"
+              description: "Update user preferences"
+              security:
+                - bearerAuth: []
+              request_body:
+                type: "object"
+                required: ["preferences"]
+                properties:
+                  preferences:
+                    type: "array"
+                    items:
+                      type: "object"
+                      required: ["key", "value"]
+                      properties:
+                        key:
+                          type: "string"
+                          example: "email_notifications"
+                        value:
+                          type: "string"
+                          example: "false"
+              responses:
+                200:
+                  description: "Preferences updated successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      message:
+                        type: "string"
+                        example: "Preferences updated successfully"
+                      updated_count:
+                        type: "integer"
+                        description: "Number of preferences updated"
+                        example: 3
+                400:
+                  description: "Bad request - validation errors"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Validation failed"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+  user_administration:
+    description: "Provides administrative tools for managing users at scale"
+    domain: "User"
+    responsibilities:
+      - "Bulk user operations"
+      - "User lifecycle management"
+      - "Account suspension/activation"
+      - "User data export/import"
+    external_dependencies:
+      - "audit-service: for admin action logging"
+      - "notification-service: for admin notifications"
+      - "reporting-service: for user analytics"
+    
+    # Entities, use cases, and events for user administration will be added here
+    entities: {}
+    use_cases: {}
+    events: {}
+    
+    # Repository layer for user administration
+    repositories:
+      AdminAccountRepository:
+        description: "Data access layer for administrative account operations"
+        interface_methods:
+          - name: "GetAll"
+            description: "Retrieves all accounts with pagination"
+            parameters:
+              - name: "limit"
+                type: "integer"
+              - name: "offset"
+                type: "integer"
+              - name: "filters"
+                type: "map[string]interface{}"
+            return_type: "[]Account"
+            error_handling: "Returns error if query fails"
+          - name: "GetByStatus"
+            description: "Retrieves accounts by status"
+            parameters:
+              - name: "status"
+                type: "string"
+            return_type: "[]Account"
+            error_handling: "Returns empty slice if no accounts found"
+          - name: "BulkUpdateStatus"
+            description: "Updates status for multiple accounts"
+            parameters:
+              - name: "account_ids"
+                type: "[]UUID"
+              - name: "status"
+                type: "string"
+            return_type: "integer"
+            error_handling: "Returns count of updated accounts"
+          - name: "ExportData"
+            description: "Exports user data for specified accounts"
+            parameters:
+              - name: "account_ids"
+                type: "[]UUID"
+              - name: "format"
+                type: "string"
+            return_type: "[]byte"
+            error_handling: "Returns error if export fails"
+
+      AdminAuditRepository:
+        description: "Data access layer for administrative audit operations"
+        interface_methods:
+          - name: "LogAdminAction"
+            description: "Logs administrative action"
+            parameters:
+              - name: "admin_id"
+                type: "UUID"
+              - name: "action"
+                type: "string"
+              - name: "target_account_id"
+                type: "UUID"
+              - name: "details"
+                type: "map[string]interface{}"
+            return_type: "error"
+            error_handling: "Returns error if logging fails"
+          - name: "GetAdminActions"
+            description: "Retrieves administrative actions with filters"
+            parameters:
+              - name: "filters"
+                type: "map[string]interface{}"
+              - name: "limit"
+                type: "integer"
+              - name: "offset"
+                type: "integer"
+            return_type: "[]AdminAction"
+            error_handling: "Returns empty slice if no actions found"
+
+    # Delivery layer for user administration
+    delivery:
+      description: "HTTP API endpoints for user administration operations"
+      base_path: "/users/admin/v1"
+      controllers:
+        AdminUserController:
+          description: "Handles administrative user management HTTP requests and responses"
+          endpoints:
+            - path: "/"
+              method: "GET"
+              description: "Get all users with pagination and filters"
+              security:
+                - bearerAuth: []
+              parameters:
+                - name: "limit"
+                  in: "query"
+                  schema:
+                    type: "integer"
+                    default: 50
+                    maximum: 100
+                  description: "Number of users to return"
+                - name: "offset"
+                  in: "query"
+                  schema:
+                    type: "integer"
+                    default: 0
+                  description: "Number of users to skip"
+                - name: "status"
+                  in: "query"
+                  schema:
+                    type: "string"
+                    enum: ["PENDING", "ACTIVE", "SUSPENDED"]
+                  description: "Filter by account status"
+                - name: "email"
+                  in: "query"
+                  schema:
+                    type: "string"
+                  description: "Filter by email (partial match)"
+              responses:
+                200:
+                  description: "Users retrieved successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      users:
+                        type: "array"
+                        items:
+                          type: "object"
+                          properties:
+                            id:
+                              type: "string"
+                              format: "uuid"
+                            email:
+                              type: "string"
+                            username:
+                              type: "string"
+                            status:
+                              type: "string"
+                            created_at:
+                              type: "integer"
+                      total:
+                        type: "integer"
+                        description: "Total number of users"
+                      limit:
+                        type: "integer"
+                      offset:
+                        type: "integer"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+                403:
+                  description: "Forbidden - insufficient permissions"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Insufficient permissions"
+
+            - path: "/{account_id}/status"
+              method: "PUT"
+              description: "Update user account status"
+              security:
+                - bearerAuth: []
+              parameters:
+                - name: "account_id"
+                  in: "path"
+                  required: true
+                  schema:
+                    type: "string"
+                    format: "uuid"
+                  description: "Account ID"
+              request_body:
+                type: "object"
+                required: ["status"]
+                properties:
+                  status:
+                    type: "string"
+                    enum: ["ACTIVE", "SUSPENDED"]
+                    description: "New account status"
+                    example: "SUSPENDED"
+                  reason:
+                    type: "string"
+                    description: "Reason for status change"
+                    example: "Violation of terms of service"
+              responses:
+                200:
+                  description: "Status updated successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      message:
+                        type: "string"
+                        example: "Account status updated successfully"
+                      account_id:
+                        type: "string"
+                        format: "uuid"
+                      new_status:
+                        type: "string"
+                      updated_at:
+                        type: "integer"
+                400:
+                  description: "Bad request - invalid status"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Invalid status value"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+                404:
+                  description: "Account not found"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Account not found"
+
+            - path: "/bulk/status"
+              method: "PUT"
+              description: "Update status for multiple accounts"
+              security:
+                - bearerAuth: []
+              request_body:
+                type: "object"
+                required: ["account_ids", "status"]
+                properties:
+                  account_ids:
+                    type: "array"
+                    items:
+                      type: "string"
+                      format: "uuid"
+                    description: "List of account IDs to update"
+                    example: ["550e8400-e29b-41d4-a716-446655440000", "660f9511-f30c-52e5-b827-337766551111"]
+                  status:
+                    type: "string"
+                    enum: ["ACTIVE", "SUSPENDED"]
+                    description: "New status for all accounts"
+                    example: "ACTIVE"
+                  reason:
+                    type: "string"
+                    description: "Reason for status change"
+                    example: "Bulk reactivation after system maintenance"
+              responses:
+                200:
+                  description: "Bulk status update completed"
+                  body:
+                    type: "object"
+                    properties:
+                      message:
+                        type: "string"
+                        example: "Bulk status update completed successfully"
+                      updated_count:
+                        type: "integer"
+                        description: "Number of accounts updated"
+                        example: 25
+                      failed_count:
+                        type: "integer"
+                        description: "Number of accounts that failed to update"
+                        example: 0
+                      failed_accounts:
+                        type: "array"
+                        items:
+                          type: "string"
+                          format: "uuid"
+                        description: "List of account IDs that failed to update"
+                400:
+                  description: "Bad request - validation errors"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Validation failed"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            - path: "/export"
+              method: "POST"
+              description: "Export user data"
+              security:
+                - bearerAuth: []
+              request_body:
+                type: "object"
+                required: ["format"]
+                properties:
+                  account_ids:
+                    type: "array"
+                    items:
+                      type: "string"
+                      format: "uuid"
+                    description: "List of account IDs to export (empty for all)"
+                    example: ["550e8400-e29b-41d4-a716-446655440000"]
+                  format:
+                    type: "string"
+                    enum: ["csv", "json", "xlsx"]
+                    description: "Export format"
+                    example: "csv"
+                  fields:
+                    type: "array"
+                    items:
+                      type: "string"
+                    description: "Fields to include in export"
+                    example: ["id", "email", "username", "status", "created_at"]
+              responses:
+                200:
+                  description: "Export completed successfully"
+                  headers:
+                    Content-Type:
+                      schema:
+                        type: "string"
+                        example: "text/csv"
+                    Content-Disposition:
+                      schema:
+                        type: "string"
+                        example: "attachment; filename=users_export.csv"
+                  body:
+                    type: "string"
+                    format: "binary"
+                    description: "Exported data file"
+                400:
+                  description: "Bad request - invalid export parameters"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Invalid export format"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+  user_analytics:
+    description: "Tracks and analyzes user behavior and system usage"
+    domain: "User"
+    responsibilities:
+      - "User activity tracking"
+      - "Usage analytics and metrics"
+      - "Behavioral insights"
+      - "Performance monitoring"
+    external_dependencies:
+      - "analytics-service: for data processing"
+      - "reporting-service: for report generation"
+      - "notification-service: for alerts"
+    
+    # Entities, use cases, and events for user analytics will be added here
+    entities: {}
+    use_cases: {}
+    events: {}
+    
+    # Repository layer for user analytics
+    repositories:
+      UserActivityRepository:
+        description: "Data access layer for user activity tracking"
+        interface_methods:
+          - name: "TrackActivity"
+            description: "Tracks user activity event"
+            parameters:
+              - name: "activity"
+                type: "UserActivity"
+            return_type: "error"
+            error_handling: "Returns error if tracking fails"
+          - name: "GetUserActivities"
+            description: "Retrieves user activities with filters"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+              - name: "activity_type"
+                type: "string"
+              - name: "start_time"
+                type: "Time"
+              - name: "end_time"
+                type: "Time"
+              - name: "limit"
+                type: "integer"
+            return_type: "[]UserActivity"
+            error_handling: "Returns empty slice if no activities found"
+          - name: "GetActivityMetrics"
+            description: "Retrieves aggregated activity metrics"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+              - name: "timeframe"
+                type: "string"
+            return_type: "ActivityMetrics"
+            error_handling: "Returns error if metrics calculation fails"
+
+      UserBehaviorRepository:
+        description: "Data access layer for user behavior analysis"
+        interface_methods:
+          - name: "RecordBehavior"
+            description: "Records user behavior pattern"
+            parameters:
+              - name: "behavior"
+                type: "UserBehavior"
+            return_type: "error"
+            error_handling: "Returns error if recording fails"
+          - name: "GetBehaviorPatterns"
+            description: "Retrieves user behavior patterns"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+              - name: "pattern_type"
+                type: "string"
+            return_type: "[]UserBehavior"
+            error_handling: "Returns empty slice if no patterns found"
+          - name: "AnalyzeTrends"
+            description: "Analyzes user behavior trends"
+            parameters:
+              - name: "timeframe"
+                type: "string"
+              - name: "metrics"
+                type: "[]string"
+            return_type: "[]TrendData"
+            error_handling: "Returns error if analysis fails"
+
+    # Delivery layer for user analytics
+    delivery:
+      description: "HTTP API endpoints for user analytics operations"
+      base_path: "/analytics/v1"
+      controllers:
+        AnalyticsController:
+          description: "Handles user analytics HTTP requests and responses"
+          endpoints:
+            - path: "/activities"
+              method: "GET"
+              description: "Get user activity data"
+              security:
+                - bearerAuth: []
+              parameters:
+                - name: "account_id"
+                  in: "query"
+                  required: false
+                  schema:
+                    type: "string"
+                    format: "uuid"
+                  description: "Filter by specific account ID"
+                - name: "activity_type"
+                  in: "query"
+                  schema:
+                    type: "string"
+                  description: "Filter by activity type"
+                - name: "start_time"
+                  in: "query"
+                  schema:
+                    type: "integer"
+                  description: "Start timestamp (epoch)"
+                - name: "end_time"
+                  in: "query"
+                  schema:
+                    type: "integer"
+                  description: "End timestamp (epoch)"
+                - name: "limit"
+                  in: "query"
+                  schema:
+                    type: "integer"
+                    default: 100
+                    maximum: 1000
+                  description: "Maximum number of activities to return"
+              responses:
+                200:
+                  description: "Activities retrieved successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      activities:
+                        type: "array"
+                        items:
+                          type: "object"
+                          properties:
+                            id:
+                              type: "string"
+                              format: "uuid"
+                            account_id:
+                              type: "string"
+                              format: "uuid"
+                            activity_type:
+                              type: "string"
+                              example: "login"
+                            timestamp:
+                              type: "integer"
+                            metadata:
+                              type: "object"
+                              additionalProperties: true
+                      total:
+                        type: "integer"
+                        description: "Total number of activities"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            - path: "/metrics"
+              method: "GET"
+              description: "Get user activity metrics"
+              security:
+                - bearerAuth: []
+              parameters:
+                - name: "account_id"
+                  in: "query"
+                  required: false
+                  schema:
+                    type: "string"
+                    format: "uuid"
+                  description: "Filter by specific account ID"
+                - name: "timeframe"
+                  in: "query"
+                  required: true
+                  schema:
+                    type: "string"
+                    enum: ["1h", "24h", "7d", "30d", "90d"]
+                  description: "Timeframe for metrics calculation"
+                - name: "metrics"
+                  in: "query"
+                  schema:
+                    type: "array"
+                    items:
+                      type: "string"
+                  description: "Specific metrics to include"
+              responses:
+                200:
+                  description: "Metrics retrieved successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      timeframe:
+                        type: "string"
+                        example: "7d"
+                      start_time:
+                        type: "integer"
+                      end_time:
+                        type: "integer"
+                      metrics:
+                        type: "object"
+                        properties:
+                          total_logins:
+                            type: "integer"
+                            description: "Total number of logins"
+                            example: 45
+                          unique_users:
+                            type: "integer"
+                            description: "Number of unique users"
+                            example: 12
+                          avg_session_duration:
+                            type: "number"
+                            description: "Average session duration in minutes"
+                            example: 23.5
+                          peak_usage_hour:
+                            type: "integer"
+                            description: "Hour with peak usage (0-23)"
+                            example: 14
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            - path: "/behaviors"
+              method: "GET"
+              description: "Get user behavior patterns"
+              security:
+                - bearerAuth: []
+              parameters:
+                - name: "account_id"
+                  in: "query"
+                  required: false
+                  schema:
+                    type: "string"
+                    format: "uuid"
+                  description: "Filter by specific account ID"
+                - name: "pattern_type"
+                  in: "query"
+                  schema:
+                    type: "string"
+                  description: "Filter by behavior pattern type"
+                - name: "start_date"
+                  in: "query"
+                  schema:
+                    type: "string"
+                    format: "date"
+                  description: "Start date for analysis (YYYY-MM-DD)"
+                - name: "end_date"
+                  in: "query"
+                  schema:
+                    type: "string"
+                    format: "date"
+                  description: "End date for analysis (YYYY-MM-DD)"
+              responses:
+                200:
+                  description: "Behavior patterns retrieved successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      patterns:
+                        type: "array"
+                        items:
+                          type: "object"
+                          properties:
+                            id:
+                              type: "string"
+                              format: "uuid"
+                            account_id:
+                              type: "string"
+                              format: "uuid"
+                            pattern_type:
+                              type: "string"
+                              example: "login_frequency"
+                            pattern_data:
+                              type: "object"
+                              additionalProperties: true
+                            confidence_score:
+                              type: "number"
+                              description: "Confidence in pattern detection (0-1)"
+                              example: 0.85
+                            detected_at:
+                              type: "integer"
+                      total_patterns:
+                        type: "integer"
+                        description: "Total number of patterns found"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            - path: "/trends"
+              method: "GET"
+              description: "Get user behavior trends over time"
+              security:
+                - bearerAuth: []
+              parameters:
+                - name: "timeframe"
+                  in: "query"
+                  required: true
+                  schema:
+                    type: "string"
+                    enum: ["7d", "30d", "90d", "1y"]
+                  description: "Timeframe for trend analysis"
+                - name: "metrics"
+                  in: "query"
+                  required: true
+                  schema:
+                    type: "array"
+                    items:
+                      type: "string"
+                      enum: ["logins", "sessions", "page_views", "actions"]
+                  description: "Metrics to analyze for trends"
+                - name: "granularity"
+                  in: "query"
+                  schema:
+                    type: "string"
+                    enum: ["hourly", "daily", "weekly", "monthly"]
+                    default: "daily"
+                  description: "Data granularity for trend analysis"
+              responses:
+                200:
+                  description: "Trends retrieved successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      timeframe:
+                        type: "string"
+                        example: "30d"
+                      granularity:
+                        type: "string"
+                        example: "daily"
+                      trends:
+                        type: "array"
+                        items:
+                          type: "object"
+                          properties:
+                            metric:
+                              type: "string"
+                              example: "logins"
+                            data_points:
+                              type: "array"
+                              items:
+                                type: "object"
+                                properties:
+                                  timestamp:
+                                    type: "integer"
+                                  value:
+                                    type: "number"
+                                  change_from_previous:
+                                    type: "number"
+                                    description: "Percentage change from previous period"
+                                    example: 5.2
+                            overall_trend:
+                              type: "string"
+                              enum: ["increasing", "decreasing", "stable"]
+                              example: "increasing"
+                            trend_strength:
+                              type: "number"
+                              description: "Strength of trend (0-1)"
+                              example: 0.75
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            - path: "/reports"
+              method: "POST"
+              description: "Generate custom analytics report"
+              security:
+                - bearerAuth: []
+              request_body:
+                type: "object"
+                required: ["report_type", "timeframe"]
+                properties:
+                  report_type:
+                    type: "string"
+                    enum: ["user_activity", "behavior_analysis", "performance_metrics", "custom"]
+                    description: "Type of report to generate"
+                    example: "user_activity"
+                  timeframe:
+                    type: "string"
+                    enum: ["1d", "7d", "30d", "90d", "1y"]
+                    description: "Timeframe for report data"
+                    example: "30d"
+                  filters:
+                    type: "object"
+                    additionalProperties: true
+                    description: "Additional filters for report data"
+                  format:
+                    type: "string"
+                    enum: ["json", "csv", "pdf"]
+                    default: "json"
+                    description: "Output format for report"
+                    example: "pdf"
+              responses:
+                200:
+                  description: "Report generated successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      report_id:
+                        type: "string"
+                        format: "uuid"
+                        description: "Unique identifier for the generated report"
+                      status:
+                        type: "string"
+                        enum: ["completed", "processing", "failed"]
+                        example: "completed"
+                      download_url:
+                        type: "string"
+                        format: "uri"
+                        description: "URL to download the report (if completed)"
+                      expires_at:
+                        type: "integer"
+                        description: "Timestamp when download URL expires"
+                202:
+                  description: "Report generation started"
+                  body:
+                    type: "object"
+                    properties:
+                      report_id:
+                        type: "string"
+                        format: "uuid"
+                      status:
+                        type: "string"
+                        example: "processing"
+                      estimated_completion:
+                        type: "integer"
+                        description: "Estimated completion timestamp"
+                400:
+                  description: "Bad request - invalid report parameters"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Invalid report type"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+  user_support:
+    description: "Manages user support requests and help desk operations"
+    domain: "User"
+    responsibilities:
+      - "Support ticket management"
+      - "User assistance workflows"
+      - "Knowledge base integration"
+      - "Escalation procedures"
+    external_dependencies:
+      - "ticket-service: for support tickets"
+      - "knowledge-base-service: for help content"
+      - "notification-service: for support updates"
+    
+    # Entities, use cases, and events for user support will be added here
+    entities: {}
+    use_cases: {}
+    events: {}
+    
+    # Repository layer for user support
+    repositories:
+      SupportTicketRepository:
+        description: "Data access layer for support ticket operations"
+        interface_methods:
+          - name: "CreateTicket"
+            description: "Creates new support ticket"
+            parameters:
+              - name: "ticket"
+                type: "SupportTicket"
+            return_type: "SupportTicket"
+            error_handling: "Returns error if creation fails"
+          - name: "GetTicketByID"
+            description: "Retrieves ticket by ID"
+            parameters:
+              - name: "id"
+                type: "UUID"
+            return_type: "SupportTicket"
+            error_handling: "Returns error if ticket not found"
+          - name: "GetTicketsByAccountID"
+            description: "Retrieves tickets for specific account"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+              - name: "status"
+                type: "string"
+            return_type: "[]SupportTicket"
+            error_handling: "Returns empty slice if no tickets found"
+          - name: "UpdateTicket"
+            description: "Updates existing ticket"
+            parameters:
+              - name: "ticket"
+                type: "SupportTicket"
+            return_type: "SupportTicket"
+            error_handling: "Returns error if update fails"
+          - name: "AddTicketResponse"
+            description: "Adds response to ticket"
+            parameters:
+              - name: "ticket_id"
+                type: "UUID"
+              - name: "response"
+                type: "TicketResponse"
+            return_type: "error"
+            error_handling: "Returns error if addition fails"
+
+      KnowledgeBaseRepository:
+        description: "Data access layer for knowledge base operations"
+        interface_methods:
+          - name: "SearchArticles"
+            description: "Searches knowledge base articles"
+            parameters:
+              - name: "query"
+                type: "string"
+              - name: "category"
+                type: "string"
+              - name: "limit"
+                type: "integer"
+            return_type: "[]KnowledgeArticle"
+            error_handling: "Returns empty slice if no articles found"
+          - name: "GetArticleByID"
+            description: "Retrieves article by ID"
+            parameters:
+              - name: "id"
+                type: "UUID"
+            return_type: "KnowledgeArticle"
+            error_handling: "Returns error if article not found"
+          - name: "GetRelatedArticles"
+            description: "Gets articles related to ticket category"
+            parameters:
+              - name: "ticket_category"
+                type: "string"
+              - name: "limit"
+                type: "integer"
+            return_type: "[]KnowledgeArticle"
+            error_handling: "Returns empty slice if no articles found"
+
+    # Delivery layer for user support
+    delivery:
+      description: "HTTP API endpoints for user support operations"
+      base_path: "/support/v1"
+      controllers:
+        SupportController:
+          description: "Handles user support HTTP requests and responses"
+          endpoints:
+            - path: "/tickets"
+              method: "POST"
+              description: "Create new support ticket"
+              security:
+                - bearerAuth: []
+              request_body:
+                type: "object"
+                required: ["subject", "description", "category"]
+                properties:
+                  subject:
+                    type: "string"
+                    maxLength: 200
+                    description: "Ticket subject"
+                    example: "Cannot reset password"
+                  description:
+                    type: "string"
+                    maxLength: 2000
+                    description: "Detailed description of the issue"
+                    example: "I've tried the password reset process multiple times but never receive the email."
+                  category:
+                    type: "string"
+                    enum: ["account", "technical", "billing", "feature_request", "other"]
+                    description: "Ticket category"
+                    example: "account"
+                  priority:
+                    type: "string"
+                    enum: ["low", "medium", "high", "urgent"]
+                    default: "medium"
+                    description: "Ticket priority level"
+                    example: "medium"
+                  attachments:
+                    type: "array"
+                    items:
+                      type: "string"
+                      format: "uri"
+                    description: "URLs to attached files"
+                    example: ["https://example.com/attachment1.pdf"]
+              responses:
+                201:
+                  description: "Ticket created successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      message:
+                        type: "string"
+                        example: "Support ticket created successfully"
+                      ticket:
+                        type: "object"
+                        properties:
+                          id:
+                            type: "string"
+                            format: "uuid"
+                          ticket_number:
+                            type: "string"
+                            example: "TKT-2024-001"
+                          status:
+                            type: "string"
+                            example: "open"
+                          created_at:
+                            type: "integer"
+                          estimated_response_time:
+                            type: "string"
+                            example: "24 hours"
+                400:
+                  description: "Bad request - validation errors"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Validation failed"
+                      details:
+                        type: "array"
+                        items:
+                          type: "object"
+                          properties:
+                            field:
+                              type: "string"
+                            message:
+                              type: "string"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            - path: "/tickets"
+              method: "GET"
+              description: "Get user's support tickets"
+              security:
+                - bearerAuth: []
+              parameters:
+                - name: "status"
+                  in: "query"
+                  schema:
+                    type: "string"
+                    enum: ["open", "in_progress", "waiting_for_user", "resolved", "closed"]
+                  description: "Filter by ticket status"
+                - name: "category"
+                  in: "query"
+                  schema:
+                    type: "string"
+                    enum: ["account", "technical", "billing", "feature_request", "other"]
+                  description: "Filter by ticket category"
+                - name: "limit"
+                  in: "query"
+                  schema:
+                    type: "integer"
+                    default: 20
+                    maximum: 100
+                  description: "Maximum number of tickets to return"
+                - name: "offset"
+                  in: "query"
+                  schema:
+                    type: "integer"
+                    default: 0
+                  description: "Number of tickets to skip"
+              responses:
+                200:
+                  description: "Tickets retrieved successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      tickets:
+                        type: "array"
+                        items:
+                          type: "object"
+                          properties:
+                            id:
+                              type: "string"
+                              format: "uuid"
+                            ticket_number:
+                              type: "string"
+                              example: "TKT-2024-001"
+                            subject:
+                              type: "string"
+                            category:
+                              type: "string"
+                            status:
+                              type: "string"
+                            priority:
+                              type: "string"
+                            created_at:
+                              type: "integer"
+                            updated_at:
+                              type: "integer"
+                            last_response_at:
+                              type: "integer"
+                      total:
+                        type: "integer"
+                        description: "Total number of tickets"
+                      limit:
+                        type: "integer"
+                      offset:
+                        type: "integer"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            - path: "/tickets/{ticket_id}"
+              method: "GET"
+              description: "Get specific support ticket details"
+              security:
+                - bearerAuth: []
+              parameters:
+                - name: "ticket_id"
+                  in: "path"
+                  required: true
+                  schema:
+                    type: "string"
+                    format: "uuid"
+                  description: "Ticket ID"
+              responses:
+                200:
+                  description: "Ticket details retrieved successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      ticket:
+                        type: "object"
+                        properties:
+                          id:
+                            type: "string"
+                            format: "uuid"
+                          ticket_number:
+                            type: "string"
+                            example: "TKT-2024-001"
+                          subject:
+                            type: "string"
+                          description:
+                            type: "string"
+                          category:
+                            type: "string"
+                          status:
+                            type: "string"
+                          priority:
+                            type: "string"
+                          created_at:
+                            type: "integer"
+                          updated_at:
+                            type: "integer"
+                          responses:
+                            type: "array"
+                            items:
+                              type: "object"
+                              properties:
+                                id:
+                                  type: "string"
+                                  format: "uuid"
+                                content:
+                                  type: "string"
+                                author_type:
+                                  type: "string"
+                                  enum: ["user", "support_agent"]
+                                created_at:
+                                  type: "integer"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+                404:
+                  description: "Ticket not found"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Ticket not found"
+
+            - path: "/tickets/{ticket_id}/respond"
+              method: "POST"
+              description: "Add response to support ticket"
+              security:
+                - bearerAuth: []
+              parameters:
+                - name: "ticket_id"
+                  in: "path"
+                  required: true
+                  schema:
+                    type: "string"
+                    format: "uuid"
+                  description: "Ticket ID"
+              request_body:
+                type: "object"
+                required: ["content"]
+                properties:
+                  content:
+                    type: "string"
+                    maxLength: 2000
+                    description: "Response content"
+                    example: "I've tried the password reset process multiple times but never receive the email."
+                  attachments:
+                    type: "array"
+                    items:
+                      type: "string"
+                      format: "uri"
+                    description: "URLs to attached files"
+                    example: ["https://example.com/screenshot.png"]
+              responses:
+                200:
+                  description: "Response added successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      message:
+                        type: "string"
+                        example: "Response added successfully"
+                      response:
+                        type: "object"
+                        properties:
+                          id:
+                            type: "string"
+                            format: "uuid"
+                          content:
+                            type: "string"
+                          created_at:
+                            type: "integer"
+                400:
+                  description: "Bad request - validation errors"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Validation failed"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+                404:
+                  description: "Ticket not found"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Ticket not found"
+
+            - path: "/knowledge"
+              method: "GET"
+              description: "Search knowledge base articles"
+              security:
+                - bearerAuth: []
+              parameters:
+                - name: "q"
+                  in: "query"
+                  required: true
+                  schema:
+                    type: "string"
+                  description: "Search query"
+                - name: "category"
+                  in: "query"
+                  schema:
+                    type: "string"
+                    enum: ["account", "technical", "billing", "features", "general"]
+                  description: "Filter by article category"
+                - name: "limit"
+                  in: "query"
+                  schema:
+                    type: "integer"
+                    default: 10
+                    maximum: 50
+                  description: "Maximum number of articles to return"
+              responses:
+                200:
+                  description: "Articles retrieved successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      query:
+                        type: "string"
+                        example: "password reset"
+                      articles:
+                        type: "array"
+                        items:
+                          type: "object"
+                          properties:
+                            id:
+                              type: "string"
+                              format: "uuid"
+                            title:
+                              type: "string"
+                              example: "How to Reset Your Password"
+                            summary:
+                              type: "string"
+                              example: "Step-by-step guide for resetting your password"
+                            category:
+                              type: "string"
+                              example: "account"
+                            relevance_score:
+                              type: "number"
+                              description: "Relevance score (0-1)"
+                              example: 0.95
+                            last_updated:
+                              type: "integer"
+                      total_found:
+                        type: "integer"
+                        description: "Total number of articles found"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            - path: "/knowledge/{article_id}"
+              method: "GET"
+              description: "Get knowledge base article details"
+              security:
+                - bearerAuth: []
+              parameters:
+                - name: "article_id"
+                  in: "path"
+                  required: true
+                  schema:
+                    type: "string"
+                    format: "uuid"
+                  description: "Article ID"
+              responses:
+                200:
+                  description: "Article retrieved successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      article:
+                        type: "object"
+                        properties:
+                          id:
+                            type: "string"
+                            format: "uuid"
+                          title:
+                            type: "string"
+                          content:
+                            type: "string"
+                          category:
+                            type: "string"
+                          tags:
+                            type: "array"
+                            items:
+                              type: "string"
+                          created_at:
+                            type: "integer"
+                          last_updated:
+                            type: "integer"
+                          helpful_count:
+                            type: "integer"
+                            description: "Number of users who found this helpful"
+                          not_helpful_count:
+                            type: "integer"
+                            description: "Number of users who found this not helpful"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+                404:
+                  description: "Article not found"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Article not found"
+
+# =============================================================================
+# 3. CROSS-CONTEXT USE CASES
+# =============================================================================
+cross_context_use_cases:
+  UserProfileUpdate:
+    description: "User updates their profile information."
+    user_journey: "User modifies profile details, system validates and saves changes."
+    user_value: "Allows users to keep their information current and accurate."
+    primary_actors:
+      - "User"
+    bounded_contexts_involved:
+      - "authentication"
+      - "profile_management"
+    entities_involved:
+      - "Account"
+      - "AccountSecurity"
+    aggregates_involved:
+      - "AccountAggregate"
+    value_objects_involved:
+      - "Email"
+    preconditions:
+      - "User is authenticated"
+      - "User account is ACTIVE"
+    initiation_triggers:
+      - "User submits profile update form"
+    steps:
+      main_flow:
+        - step: 1
+          action: "User modifies profile information"
+        - step: 2
+          action: "System validates changes"
+        - step: 3
+          action: "System updates user profile"
+        - step: 4
+          action: "System confirms changes"
+      alternative_flows:
+        - name: "EmailChange"
+          conditions:
+            - "User changes email address"
+          steps:
+            - step: 1
+              action: "System sends verification email to new address"
+            - step: 2
+              action: "System marks email as unverified until confirmed"
+        - name: "UsernameChange"
+          conditions:
+            - "User changes username"
+          steps:
+            - step: 1
+              action: "System checks username availability"
+            - step: 2
+              action: "System updates username if available"
+    events_emitted:
+      - "UserProfileUpdated"
+      - "EmailChangeRequested"
+    business_rules:
+      - "Email changes require verification"
+      - "Username must remain unique"
+      - "Profile updates are logged for audit"
+
+# =============================================================================
+# 4. CROSS-CONTEXT EVENTS
+# =============================================================================
+cross_context_events:
+  UserProfileUpdated:
+    bounded_contexts: ["authentication", "profile_management"]
+    description: "Emitted when a user updates their profile information."
+    user_journey: "User modifies and saves profile changes."
+    user_value: "Keeps user information current and accurate."
+    payload_schema:
+      - field_name: "account_id"
+        type: "string"
+        description: "Unique identifier of the user"
+        example: "550e8400-e29b-41d4-a716-446655440000"
+      - field_name: "updated_fields"
+        type: "array"
+        description: "List of fields that were updated"
+        example: ["full_name", "username"]
+      - field_name: "updated_at"
+        type: "integer"
+        description: "Timestamp when profile was updated"
+        example: 1700000000
+    published_by: "auth-service"
+    subscribed_clients:
+      - "audit-service"
+      - "analytics-service"
+      - "profile-service"
+    raising_conditions:
+      - "User profile updated successfully"
+
+  EmailChangeRequested:
+    bounded_contexts: ["authentication", "profile_management"]
+    description: "Emitted when a user requests to change their email address."
+    user_journey: "User initiates email change process."
+    user_value: "Enables secure email address updates."
+    payload_schema:
+      - field_name: "account_id"
+        type: "string"
+        description: "Unique identifier of the user"
+        example: "550e8400-e29b-41d4-a716-446655440000"
+      - field_name: "old_email"
+        type: "string"
+        description: "Previous email address"
+        example: "old@example.com"
+      - field_name: "new_email"
+        type: "string"
+        description: "New email address"
+        example: "new@example.com"
+      - field_name: "requested_at"
+        type: "integer"
+        description: "Timestamp when change was requested"
+        example: 1700000000
+    published_by: "auth-service"
+    subscribed_clients:
+      - "notification-service"
+      - "audit-service"
+    raising_conditions:
+      - "Email change requested"
+
+# =============================================================================
+# 5. DOMAIN-WIDE CONFIGURATIONS
+# =============================================================================
+domain_configurations:
+  security_considerations:
+    password_security:
+      - "Passwords must be hashed using bcrypt with cost factor 12"
+      - "Password reset tokens must expire after 1 hour"
+      - "Failed login attempts trigger account lockout after 5 attempts"
+      - "Account lockout duration: 15 minutes"
+    session_security:
+      - "JWT tokens with 6-hour expiration"
+      - "Refresh tokens with 7-day expiration"
+      - "Session invalidation on password change"
+    data_protection:
+      - "Personal data encryption at rest"
+      - "HTTPS for all communications"
+      - "GDPR compliance for data handling"
+
+  performance_requirements:
+    response_times:
+      - "User registration: < 2 seconds"
+      - "User login: < 1 second"
+      - "Email verification: < 500ms"
+    scalability:
+      - "Support 10,000 concurrent users"
+      - "Handle 1000 registrations per minute"
+      - "Database connection pooling with max 100 connections"
+
+  monitoring_and_alerting:
+    metrics:
+      - "User registration rate"
+      - "Login success/failure rates"
+      - "Email verification completion rate"
+      - "Password reset request rate"
+    alerts:
+      - "High login failure rate (>20%)"
+      - "Unusual registration patterns"
+      - "Service response time degradation"
+      - "Database connection issues"
+
+  user_onboarding:
+    description: "Manages user onboarding process and welcome flows"
+    domain: "User"
+    responsibilities:
+      - "Welcome email sequences"
+      - "Onboarding tutorials and guides"
+      - "Feature introduction workflows"
+      - "User engagement tracking"
+    external_dependencies:
+      - "notification-service: for welcome emails"
+      - "content-service: for tutorials"
+      - "analytics-service: for engagement tracking"
+    
+    # Entities, use cases, and events for user onboarding will be added here
+    entities: {}
+    use_cases: {}
+    events: {}
+    
+    # Repository layer for user onboarding
+    repositories:
+      OnboardingFlowRepository:
+        description: "Data access layer for onboarding flow operations"
+        interface_methods:
+          - name: "GetFlowByAccountID"
+            description: "Retrieves onboarding flow for specific account"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+            return_type: "OnboardingFlow"
+            error_handling: "Returns error if flow not found"
+          - name: "UpdateProgress"
+            description: "Updates onboarding progress"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+              - name: "step"
+                type: "string"
+              - name: "completed"
+                type: "boolean"
+            return_type: "error"
+            error_handling: "Returns error if update fails"
+          - name: "GetCompletedSteps"
+            description: "Gets completed onboarding steps"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+            return_type: "[]string"
+            error_handling: "Returns empty slice if no steps completed"
+
+      WelcomeEmailRepository:
+        description: "Data access layer for welcome email operations"
+        interface_methods:
+          - name: "ScheduleWelcomeEmail"
+            description: "Schedules welcome email for account"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+              - name: "email_type"
+                type: "string"
+              - name: "scheduled_at"
+                type: "Time"
+            return_type: "error"
+            error_handling: "Returns error if scheduling fails"
+          - name: "MarkEmailSent"
+            description: "Marks welcome email as sent"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+              - name: "email_type"
+                type: "string"
+              - name: "sent_at"
+                type: "Time"
+            return_type: "error"
+            error_handling: "Returns error if update fails"
+
+    # Delivery layer for user onboarding
+    delivery:
+      description: "HTTP API endpoints for user onboarding operations"
+      base_path: "/onboarding/v1"
+      controllers:
+        OnboardingController:
+          description: "Handles user onboarding HTTP requests and responses"
+          endpoints:
+            - path: "/progress"
+              method: "GET"
+              description: "Get user's onboarding progress"
+              security:
+                - bearerAuth: []
+              responses:
+                200:
+                  description: "Onboarding progress retrieved successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      account_id:
+                        type: "string"
+                        format: "uuid"
+                      current_step:
+                        type: "string"
+                        example: "profile_setup"
+                      completed_steps:
+                        type: "array"
+                        items:
+                          type: "string"
+                        example: ["welcome", "email_verification"]
+                      total_steps:
+                        type: "integer"
+                        example: 5
+                      progress_percentage:
+                        type: "integer"
+                        description: "Completion percentage (0-100)"
+                        example: 40
+                      estimated_completion:
+                        type: "string"
+                        example: "2 minutes"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            - path: "/progress/{step}"
+              method: "POST"
+              description: "Mark onboarding step as completed"
+              security:
+                - bearerAuth: []
+              parameters:
+                - name: "step"
+                  in: "path"
+                  required: true
+                  schema:
+                    type: "string"
+                  description: "Onboarding step to complete"
+              request_body:
+                type: "object"
+                properties:
+                  metadata:
+                    type: "object"
+                    additionalProperties: true
+                    description: "Additional data about step completion"
+                    example: {"time_spent": 120, "skipped": false}
+              responses:
+                200:
+                  description: "Step marked as completed"
+                  body:
+                    type: "object"
+                    properties:
+                      message:
+                        type: "string"
+                        example: "Step completed successfully"
+                      step:
+                        type: "string"
+                      completed_at:
+                        type: "integer"
+                      next_step:
+                        type: "string"
+                        example: "feature_tour"
+                400:
+                  description: "Bad request - invalid step"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Invalid step"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            - path: "/tutorials"
+              method: "GET"
+              description: "Get available onboarding tutorials"
+              security:
+                - bearerAuth: []
+              parameters:
+                - name: "category"
+                  in: "query"
+                  schema:
+                    type: "string"
+                    enum: ["getting_started", "features", "advanced", "tips"]
+                  description: "Filter by tutorial category"
+              responses:
+                200:
+                  description: "Tutorials retrieved successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      tutorials:
+                        type: "array"
+                        items:
+                          type: "object"
+                          properties:
+                            id:
+                              type: "string"
+                              format: "uuid"
+                            title:
+                              type: "string"
+                              example: "Getting Started with Your Account"
+                            description:
+                              type: "string"
+                              example: "Learn the basics of managing your account"
+                            category:
+                              type: "string"
+                              example: "getting_started"
+                            duration:
+                              type: "integer"
+                              description: "Estimated duration in minutes"
+                              example: 5
+                            video_url:
+                              type: "string"
+                              format: "uri"
+                            interactive:
+                              type: "boolean"
+                              description: "Whether tutorial is interactive"
+                              example: true
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+  user_compliance:
+    description: "Manages user data compliance and regulatory requirements"
+    domain: "User"
+    responsibilities:
+      - "GDPR compliance management"
+      - "Data retention policies"
+      - "Privacy consent tracking"
+      - "Data export and deletion"
+    external_dependencies:
+      - "audit-service: for compliance logging"
+      - "legal-service: for policy validation"
+      - "storage-service: for data operations"
+    
+    # Entities, use cases, and events for user compliance will be added here
+    entities: {}
+    use_cases: {}
+    events: {}
+    
+    # Repository layer for user compliance
+    repositories:
+      ComplianceRepository:
+        description: "Data access layer for compliance operations"
+        interface_methods:
+          - name: "RecordConsent"
+            description: "Records user consent for data processing"
+            parameters:
+              - name: "consent"
+                type: "DataConsent"
+            return_type: "error"
+            error_handling: "Returns error if recording fails"
+          - name: "GetConsentHistory"
+            description: "Gets consent history for account"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+            return_type: "[]DataConsent"
+            error_handling: "Returns empty slice if no consents found"
+          - name: "UpdateConsent"
+            description: "Updates user consent preferences"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+              - name: "consent_type"
+                type: "string"
+              - name: "granted"
+                type: "boolean"
+            return_type: "error"
+            error_handling: "Returns error if update fails"
+
+      DataRetentionRepository:
+        description: "Data access layer for data retention operations"
+        interface_methods:
+          - name: "GetRetentionPolicies"
+            description: "Gets data retention policies"
+            return_type: "[]RetentionPolicy"
+            error_handling: "Returns empty slice if no policies found"
+          - name: "ScheduleDataDeletion"
+            description: "Schedules data deletion for account"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+              - name: "deletion_type"
+                type: "string"
+              - name: "scheduled_at"
+                type: "Time"
+            return_type: "error"
+            error_handling: "Returns error if scheduling fails"
+          - name: "GetDeletionSchedule"
+            description: "Gets scheduled data deletions"
+            parameters:
+              - name: "account_id"
+                type: "UUID"
+            return_type: "[]DataDeletion"
+            error_handling: "Returns empty slice if no deletions scheduled"
+
+    # Delivery layer for user compliance
+    delivery:
+      description: "HTTP API endpoints for user compliance operations"
+      base_path: "/compliance/v1"
+      controllers:
+        ComplianceController:
+          description: "Handles user compliance HTTP requests and responses"
+          endpoints:
+            - path: "/consent"
+              method: "GET"
+              description: "Get user's current consent status"
+              security:
+                - bearerAuth: []
+              responses:
+                200:
+                  description: "Consent status retrieved successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      account_id:
+                        type: "string"
+                        format: "uuid"
+                      consents:
+                        type: "array"
+                        items:
+                          type: "object"
+                          properties:
+                            type:
+                              type: "string"
+                              example: "marketing_emails"
+                            granted:
+                              type: "boolean"
+                              example: true
+                            granted_at:
+                              type: "integer"
+                            last_updated:
+                              type: "integer"
+                            description:
+                              type: "string"
+                              example: "Receive marketing and promotional emails"
+                      last_updated:
+                      type: "integer"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            - path: "/consent"
+              method: "PUT"
+              description: "Update user consent preferences"
+              security:
+                - bearerAuth: []
+              request_body:
+                type: "object"
+                required: ["consents"]
+                properties:
+                  consents:
+                    type: "array"
+                    items:
+                      type: "object"
+                      required: ["type", "granted"]
+                      properties:
+                        type:
+                          type: "string"
+                          enum: ["marketing_emails", "analytics_tracking", "third_party_sharing", "cookies"]
+                          description: "Type of consent"
+                          example: "marketing_emails"
+                        granted:
+                          type: "boolean"
+                          description: "Whether consent is granted"
+                          example: false
+                        reason:
+                          type: "string"
+                          description: "Reason for consent change (optional)"
+                          example: "Too many marketing emails"
+              responses:
+                200:
+                  description: "Consent preferences updated successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      message:
+                        type: "string"
+                        example: "Consent preferences updated successfully"
+                      updated_consents:
+                        type: "integer"
+                        description: "Number of consents updated"
+                        example: 2
+                      updated_at:
+                        type: "integer"
+                400:
+                  description: "Bad request - validation errors"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Validation failed"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            - path: "/data-export"
+              method: "POST"
+              description: "Request data export for GDPR compliance"
+              security:
+                - bearerAuth: []
+              request_body:
+                type: "object"
+                required: ["export_type"]
+                properties:
+                  export_type:
+                    type: "string"
+                    enum: ["personal_data", "activity_logs", "consent_history", "complete"]
+                    description: "Type of data to export"
+                    example: "personal_data"
+                  format:
+                    type: "string"
+                    enum: ["json", "csv", "xml"]
+                    default: "json"
+                    description: "Export format"
+                    example: "json"
+              responses:
+                202:
+                  description: "Data export request accepted"
+                  body:
+                    type: "object"
+                    properties:
+                      message:
+                        type: "string"
+                        example: "Data export request accepted"
+                      request_id:
+                        type: "string"
+                        format: "uuid"
+                      estimated_completion:
+                        type: "string"
+                        example: "24 hours"
+                      notification_email:
+                        type: "string"
+                        format: "email"
+                        example: "user@example.com"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            - path: "/data-deletion"
+              method: "POST"
+              description: "Request data deletion for GDPR compliance"
+              security:
+                - bearerAuth: []
+              request_body:
+                type: "object"
+                required: ["deletion_type", "reason"]
+                properties:
+                  deletion_type:
+                    type: "string"
+                    enum: ["account_deletion", "data_anonymization", "selective_deletion"]
+                    description: "Type of deletion requested"
+                    example: "account_deletion"
+                  reason:
+                    type: "string"
+                    maxLength: 500
+                    description: "Reason for deletion request"
+                    example: "No longer using the service"
+                  selective_data:
+                    type: "array"
+                    items:
+                      type: "string"
+                    description: "Specific data types to delete (for selective deletion)"
+                    example: ["activity_logs", "marketing_preferences"]
+              responses:
+                202:
+                  description: "Data deletion request accepted"
+                  body:
+                    type: "object"
+                    properties:
+                      message:
+                        type: "string"
+                        example: "Data deletion request accepted"
+                      request_id:
+                        type: "string"
+                        format: "uuid"
+                      deletion_type:
+                        type: "string"
+                      estimated_completion:
+                        type: "string"
+                        example: "7 days"
+                      confirmation_required:
+                        type: "boolean"
+                        description: "Whether user confirmation is required"
+                        example: true
+                400:
+                  description: "Bad request - validation errors"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Invalid deletion type"
+                401:
+                  description: "Unauthorized"
+                  body:
+                    type: "object"
+                    properties:
+                      error:
+                        type: "string"
+                        example: "Unauthorized"
+
+            - path: "/privacy-policy"
+              method: "GET"
+              description: "Get current privacy policy"
+              responses:
+                200:
+                  description: "Privacy policy retrieved successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      version:
+                        type: "string"
+                        example: "2.1"
+                      effective_date:
+                        type: "string"
+                        format: "date"
+                        example: "2024-01-15"
+                      content:
+                        type: "string"
+                        description: "Privacy policy content"
+                      summary:
+                        type: "string"
+                        description: "Brief summary of key changes"
+                        example: "Updated data retention policies and added new consent options"
+                      download_url:
+                        type: "string"
+                        format: "uri"
+                        description: "URL to download PDF version"
+                        example: "https://example.com/privacy-policy.pdf"
+
+            - path: "/retention-policies"
+              method: "GET"
+              description: "Get data retention policies"
+              responses:
+                200:
+                  description: "Retention policies retrieved successfully"
+                  body:
+                    type: "object"
+                    properties:
+                      policies:
+                        type: "array"
+                        items:
+                          type: "object"
+                          properties:
+                            data_type:
+                              type: "string"
+                              example: "account_data"
+                            retention_period:
+                              type: "string"
+                              example: "7 years"
+                            description:
+                              type: "string"
+                              example: "Core account information retained for legal compliance"
+                            legal_basis:
+                              type: "string"
+                              example: "Contract performance and legal obligations"
+                            deletion_trigger:
+                              type: "string"
+                              example: "Account deletion or 7 years after last activity"
+                      last_updated:
+                        type: "integer"
+                      next_review:
+                        type: "integer"
+                        description: "Timestamp for next policy review"
