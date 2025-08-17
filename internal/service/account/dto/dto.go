@@ -1,6 +1,6 @@
 package dto
 
-import "time"
+import "workluv/internal/shared"
 
 // CreateAccountRequest represents the request to create a new account
 type CreateAccountRequest struct {
@@ -11,13 +11,13 @@ type CreateAccountRequest struct {
 
 // CreateAccountResponse represents the response after creating an account
 type CreateAccountResponse struct {
-	ID            string    `json:"id"`
-	Email         string    `json:"email"`
-	FullName      string    `json:"full_name"`
-	IsActive      bool      `json:"is_active"`
-	EmailVerified bool      `json:"email_verified"`
-	CreatedAt     time.Time `json:"created_at"`
-	Message       string    `json:"message"`
+	ID            string      `json:"id"`
+	Email         string      `json:"email"`
+	FullName      string      `json:"full_name"`
+	IsActive      bool        `json:"is_active"`
+	EmailVerified bool        `json:"email_verified"`
+	CreatedAt     shared.Time `json:"created_at"`
+	Message       string      `json:"message"`
 }
 
 // VerifyEmailRequest represents the request to verify an email

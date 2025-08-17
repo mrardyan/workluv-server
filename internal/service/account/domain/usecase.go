@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"workluv/internal/infrastructure"
+	"workluv/internal/shared"
 	"workluv/pkg/config"
 
 	"github.com/google/uuid"
@@ -118,6 +119,7 @@ func (uc *UseCase) VerifyEmail(ctx context.Context, token string) error {
 	}
 
 	account.EmailVerified = true
+	account.UpdatedAt = shared.Now()
 	_, err = uc.Repo.Update(ctx, account)
 	if err != nil {
 		return fmt.Errorf("failed to update account: %w", err)

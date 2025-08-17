@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 	accountdomain "workluv/internal/service/account/domain"
+	"workluv/internal/shared"
 
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -140,7 +140,7 @@ func (d *Database) Update(ctx context.Context, account accountdomain.Account) (a
 		WHERE id = $1
 		RETURNING id, email, password_hash, full_name, email_verified, created_at, updated_at`
 
-	account.UpdatedAt = time.Now()
+	account.UpdatedAt = shared.Now()
 
 	row := d.DB.QueryRowContext(ctx, query,
 		account.ID,
@@ -255,7 +255,7 @@ func (d *Database) UpdateVerification(ctx context.Context, verification accountd
 		WHERE id = $1
 		RETURNING id, account_id, type, status, token, expires_at, completed_at, created_at, updated_at`
 
-	verification.UpdatedAt = time.Now()
+	verification.UpdatedAt = shared.Now()
 
 	row := d.DB.QueryRowContext(ctx, query,
 		verification.ID,

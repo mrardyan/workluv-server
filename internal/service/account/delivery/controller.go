@@ -7,6 +7,7 @@ import (
 	"workluv/internal/service/account/domain"
 	"workluv/internal/service/account/dto"
 	"workluv/internal/service/account/repository"
+	"workluv/internal/shared"
 	"workluv/pkg/config"
 
 	"github.com/gin-gonic/gin"
@@ -63,6 +64,8 @@ func (ctl *Controller) CreateAccount(c *gin.Context) {
 		FullName:      req.FullName,
 		IsActive:      true,
 		EmailVerified: false,
+		CreatedAt:     shared.Now(),
+		UpdatedAt:     shared.Now(),
 	}
 
 	createdAccount, err := ctl.UseCase.CreateAccount(c.Request.Context(), account)

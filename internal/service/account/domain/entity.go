@@ -5,19 +5,20 @@ import (
 	"encoding/hex"
 	"strings"
 	"time"
+	"workluv/internal/shared"
 
 	"github.com/google/uuid"
 )
 
 type Account struct {
-	ID            uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
-	Email         Email     `gorm:"uniqueIndex;not null" json:"email"`
-	PasswordHash  string    `gorm:"not null" json:"-"`
-	FullName      string    `gorm:"size:200" json:"full_name"`
-	IsActive      bool      `gorm:"default:true" json:"is_active"`
-	EmailVerified bool      `gorm:"default:false" json:"email_verified"`
-	CreatedAt     time.Time `gorm:"default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt     time.Time `gorm:"default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID            uuid.UUID   `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	Email         Email       `gorm:"uniqueIndex;not null" json:"email"`
+	PasswordHash  string      `gorm:"not null" json:"-"`
+	FullName      string      `gorm:"size:200" json:"full_name"`
+	IsActive      bool        `gorm:"default:true" json:"is_active"`
+	EmailVerified bool        `gorm:"default:false" json:"email_verified"`
+	CreatedAt     shared.Time `gorm:"default:EXTRACT(epoch FROM NOW())" json:"created_at"`
+	UpdatedAt     shared.Time `gorm:"default:EXTRACT(epoch FROM NOW())" json:"updated_at"`
 }
 
 // TableName overrides the table name for GORM
@@ -66,10 +67,10 @@ type Verification struct {
 	Type        VerificationType   `gorm:"type:varchar(50);not null;index" json:"type"`
 	Status      VerificationStatus `gorm:"type:varchar(20);default:'pending';index" json:"status"`
 	Token       string             `gorm:"type:varchar(64);not null;uniqueIndex" json:"-"`
-	ExpiresAt   time.Time          `gorm:"not null;index" json:"expires_at"`
-	CompletedAt *time.Time         `gorm:"index" json:"completed_at,omitempty"`
-	CreatedAt   time.Time          `gorm:"default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt   time.Time          `gorm:"default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ExpiresAt   shared.Time        `gorm:"not null;index" json:"expires_at"`
+	CompletedAt *shared.Time       `gorm:"index" json:"completed_at,omitempty"`
+	CreatedAt   shared.Time        `gorm:"default:EXTRACT(epoch FROM NOW())" json:"created_at"`
+	UpdatedAt   shared.Time        `gorm:"default:EXTRACT(epoch FROM NOW())" json:"updated_at"`
 
 	// Relationships
 	Account Account `gorm:"foreignKey:AccountID;references:ID" json:"account,omitempty"`
@@ -94,13 +95,13 @@ func (v *Verification) GenerateToken() error {
 	// Set expiration based on verification type
 	switch v.Type {
 	case EmailVerification:
-		v.ExpiresAt = time.Now().Add(24 * time.Hour) // 24 hours for email
+		v.ExpiresAt = shared.NewTime(time.Now().Add(24 * time.Hour)) // 24 hours for email
 	case PhoneVerification:
-		v.ExpiresAt = time.Now().Add(15 * time.Minute) // 15 minutes for SMS
+		v.ExpiresAt = shared.NewTime(time.Now().Add(15 * time.Minute)) // 15 minutes for SMS
 	case TwoFactorSetup:
-		v.ExpiresAt = time.Now().Add(1 * time.Hour) // 1 hour for 2FA setup
+		v.ExpiresAt = shared.NewTime(time.Now().Add(1 * time.Hour)) // 1 hour for 2FA setup
 	default:
-		v.ExpiresAt = time.Now().Add(24 * time.Hour) // Default 24 hours
+		v.ExpiresAt = shared.NewTime(time.Now().Add(24 * time.Hour)) // Default 24 hours
 	}
 
 	v.Status = VerificationPending
@@ -120,7 +121,7 @@ func (v *Verification) IsTokenValid(token string) bool {
 	}
 
 	// Check if token has expired
-	if time.Now().After(v.ExpiresAt) {
+	if shared.Now().After(v.ExpiresAt) {
 		return false
 	}
 
@@ -130,13 +131,13 @@ func (v *Verification) IsTokenValid(token string) bool {
 // MarkAsCompleted marks the verification as completed
 func (v *Verification) MarkAsCompleted() {
 	v.Status = VerificationCompleted
-	now := time.Now()
+	now := shared.Now()
 	v.CompletedAt = &now
 }
 
 // IsExpired checks if the verification has expired
 func (v *Verification) IsExpired() bool {
-	return time.Now().After(v.ExpiresAt) && v.Status == VerificationPending
+	return shared.Now().After(v.ExpiresAt) && v.Status == VerificationPending
 }
 
 // NewEmailVerification creates a new email verification for an account
